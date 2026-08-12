@@ -129,7 +129,54 @@ local ROW_ADD = ROW_ANCHOR .. [[
     .. "diorama rungs are untouched -- a dollhouse wants its roof off." },]]
 
 return function(mod)
-  mod.options:define({
+  -- ------- THE LAVENDER VEIL: a worldPresent pipeline of our own.
+-- Flora's fog shells are world geometry drawn before the cast pass, so
+-- sprites always punched through them (issue #6). This pass runs on the
+-- COMPOSITED world canvas -- terrain, casts, everything -- and before
+-- the UI, by the same documented route tilt-shift uses. Intensity comes
+-- from the envelope Flora eases and publishes, so the veil fades in and
+-- out with the shells rather than switching. A pass-through whenever
+-- the envelope is at zero, which is everywhere but Lavender.
+pcall(function()
+  local veilScratch = nil
+  mod.content.render_pipelines:register("lavveil", {
+    label = "LAV VEIL",
+    levels = { "AUTO" },
+    priority = 9,   -- just under tilt-shift, so the blur sees the fog
+    update = function() end,
+    worldPresent = function(canvas)
+      local env = tonumber(rawget(_G, "__ds_lavfog")) or 0
+      if env <= 0.01 or not canvas then return canvas end
+      local ok, out = pcall(function()
+        local w, h = canvas:getDimensions()
+        if not veilScratch or veilScratch:getWidth() ~= w
+           or veilScratch:getHeight() ~= h then
+          veilScratch = love.graphics.newCanvas(w, h)
+        end
+        love.graphics.push("all")
+        love.graphics.setCanvas(veilScratch)
+        love.graphics.clear(0, 0, 0, 0)
+        love.graphics.setColor(1, 1, 1, 1)
+        love.graphics.draw(canvas)
+        -- the veil: pale lavender-grey, heavier with height (the far
+        -- field sits high on screen in first person), silent below
+        local a = 0.34 * env
+        for band = 0, 5 do
+          local y0 = h * band / 6
+          love.graphics.setColor(0.78, 0.76, 0.84,
+                                 a * (1 - band / 6.5))
+          love.graphics.rectangle("fill", 0, y0, w, h / 6 + 1)
+        end
+        love.graphics.pop()
+        return veilScratch
+      end)
+      return (ok and out) or canvas
+    end,
+    invalidate = function() veilScratch = nil end,
+  })
+end)
+
+mod.options:define({
     -- Removal is deliberate and opt-IN.  This used to be an ON/OFF
     -- "CEILING PATCH" row, which meant any stored false -- a manager
     -- rewrite, a stale value, a stray click -- silently uninstalled
@@ -209,6 +256,10 @@ return function(mod)
       default = "NORMAL",
       choices = { { "NARROW", "NARROW" }, { "NORMAL", "NORMAL" },
                   { "WIDE", "WIDE" }, { "ULTRA", "ULTRA" } } },
+    { key = "bouldertrees", label = "BOULDER TREES", type = "toggle",
+      default = false },
+    { key = "shadows", label = "OBJECT SHADOWS", type = "toggle",
+      default = true },
     { key = "dof", label = "DEPTH BLUR", type = "choice",
       default = "OFF",
       choices = { { "OFF", "OFF" }, { "1", "1" }, { "2", "2" },
@@ -295,6 +346,8 @@ return function(mod)
       ceildetail = opt("ceildetail", true) ~= false,
       fpfov = opt("fpfov", "NORMAL"),
       dof = opt("dof", "OFF"),
+      bouldertrees = opt("bouldertrees", false) == true,
+      shadows = opt("shadows", true) ~= false,
       rain = opt("rain", "SOMETIMES"),
       umbrellas = opt("umbrellas", true) ~= false,
       puddles = opt("puddles", true) ~= false,
@@ -566,6 +619,10 @@ return function(mod)
   -- already patched took the "module updated" branch instead, so the
   -- splice never landed and the feature did nothing. Idempotent: each
   -- file is checked for its own marker before anything is written.
+  local spliceSunCast, spliceBattleProps   -- defined below manageOne's
+                                           -- helpers; forward-declared
+                                           -- so apply() closes over the
+                                           -- LOCALS, not nil globals
   local function spliceTallTrees(base)
       do
         local stPath = base .. "/lib/Structures.lua"
@@ -820,6 +877,8 @@ local Flora = __dsMod("Flora", "__ds_flora_status")]]
     end
     local sky = mod:read("payload_sky.lua")
     spliceTallTrees(base)
+    spliceSunCast(base)
+    spliceBattleProps(base)
     if sky then writeTracked(base .. "/lib/SkyLayer.lua", sky) end
     local flora = mod:read("payload_flora.lua")
     if flora then writeTracked(base .. "/lib/Flora.lua", flora) end
@@ -864,19 +923,73 @@ local Flora = __dsMod("Flora", "__ds_flora_status")]]
   end
 
   -- ------- back the patch out
+  -- Only these basenames are OURS to delete. Everything else in the
+  -- ledger is an engine file this mod spliced, and an engine file is
+  -- NEVER deleted: restored from backup when one exists, marker-
+  -- stripped when it does not but our splice text is present, and left
+  -- entirely alone when the content is pristine (a base reinstall
+  -- already replaced it -- issue #8, where the old walk deleted
+  -- ChunkMesher.lua and Structures.lua on exactly that path).
+  local OURS = {
+    ["Ceiling.lua"] = true, ["Flora.lua"] = true, ["Backdrop.lua"] = true,
+    ["SkyLayer.lua"] = true, ["Jump.lua"] = true,
+  }
+  local function oursByName(path)
+    local name = path:match("([^/]+)$") or ""
+    if OURS[name] then return true end
+    if name:match("^backdrop%d*%.png$") then return true end
+    if name:match("^posters.*%.png$") then return true end
+    if name:match("^amb%-.+%.mp3$") then return true end
+    if name:match("^sfx%-.+%.mp3$") then return true end
+    return false
+  end
+  local function stripSplices(txt)
+    -- the two mesher blocks this mod has ever injected, by their own
+    -- markers; anything unrecognised is left in place
+    local t = txt
+    t = t:gsub("s2%[2%] = c%[2%] %+ %(st%.lift or 0%)"
+               .. " %-%- ds_fp_ceilings __ds_round_base[^\n]*\n"
+               .. ".-\n          end\n", "s2[2] = c[2]\n", 1)
+    t = t:gsub("s2%[2%] = c%[2%] %+ %(st%.lift or 0%)[^\n]*\n",
+               "s2[2] = c[2]\n", 1)
+    t = t:gsub("\n[^\n]*ds_fp_ceilings __ds_round_cells.-"
+               .. "\n[^\n]*%-%- /ds_fp_ceilings\n", "\n", 1)
+    t = t:gsub("  %-%- ds_fp_ceilings __ds_sun_cast[^\n]*\n"
+               .. "  pcall%(function%(%)\n.-\n  end%)\n", "", 1)
+    t = t:gsub("      %-%- ds_fp_ceilings __ds_btl_props\n"
+               .. "      pcall%(function%(%)\n.-\n      end%)\n", "")
+    return t
+  end
   local function unpatch(base)
-    -- the ledger first: everything we ever wrote, exactly
+    -- the ledger first -- everything we ever wrote -- under the new
+    -- law: our own files may be deleted, engine files may only be
+    -- restored, stripped, or left be
     local led = read(LEDGER)
     if led then
       for path in led:gmatch("[^\n]+") do
         local pre = path .. ".pre-ceiling"
         local orig = read(pre)
-        if orig then
+        local cur = read(path)
+        if orig and cur then
           write(path, orig)
           remove(pre)
-        elseif inSave(path) then
-          remove(path)
+        elseif cur == nil then
+          -- already gone; nothing to do
+        elseif oursByName(path) then
+          if inSave(path) then remove(path) end
+        elseif cur:find("ds_fp_ceilings", 1, true)
+               or cur:find(MARK, 1, true) then
+          local stripped = stripSplices(cur)
+          if stripped ~= cur then
+            write(path, stripped)
+            say(path .. ": splice stripped in place (no backup).")
+          else
+            say(path .. ": bears this mod's splice but no backup and "
+                .. "no known strip -- LEFT UNTOUCHED. Reinstall the "
+                .. "base mod to fully reset it.")
+          end
         end
+        -- pristine engine file: left entirely alone
       end
       remove(LEDGER)
     end
@@ -922,6 +1035,63 @@ local Flora = __dsMod("Flora", "__ds_flora_status")]]
   end
 
   -- ------- decide, once, at load
+  -- THE SUN SPLICE: the raised stems cast real shadows. One guarded
+  -- call added after the sun pass records the water, reaching the live
+  -- Flora through the same registry the hot-swap uses.
+  spliceSunCast = function(base)
+    local p = base .. "/lib/VoxelScene.lua"
+    local src = readSrc(p)
+    if not src or src:find("__ds_sun_cast", 1, true) then return end
+    local a = "  ShadowMap.draw(water, atlasFor(state.map), nil)\n"
+    if not src:find(a, 1, true) then
+      say("sun-cast anchor not found; stems will not cast this build.")
+      return
+    end
+    if not read(p .. ".pre-ceiling") and inSave(p) then
+      write(p .. ".pre-ceiling", src)
+    end
+    local add = a
+      .. "  -- ds_fp_ceilings __ds_sun_cast: companion stems cast too\n"
+      .. "  pcall(function()\n"
+      .. "    local live = rawget(_G, \"__ds_live\")\n"
+      .. "    if live and live.Flora and live.Flora.castShadows then\n"
+      .. "      live.Flora.castShadows(state, ShadowMap, Mat4)\n"
+      .. "    end\n"
+      .. "  end)\n"
+    writeTracked(p, (src:gsub(a:gsub("%p", "%%%1"), function()
+      return add
+    end, 1)))
+    say("sun pass spliced: raised stems cast shadows.")
+  end
+
+  -- THE BATTLE SPLICE: the same stems stand during 3D battles, drawn
+  -- right after the battle's own terrain -- both terrain sites.
+  spliceBattleProps = function(base)
+    local p = base .. "/lib/BattleScene.lua"
+    local src = readSrc(p)
+    if not src or src:find("__ds_btl_props", 1, true) then return end
+    local a = "      Voxel3D.draw(terrain, atlasFor(host), nil)\n"
+    if not src:find(a, 1, true) then
+      say("battle anchor not found; stems sit battles out this build.")
+      return
+    end
+    if not read(p .. ".pre-ceiling") and inSave(p) then
+      write(p .. ".pre-ceiling", src)
+    end
+    local add = a
+      .. "      -- ds_fp_ceilings __ds_btl_props\n"
+      .. "      pcall(function()\n"
+      .. "        local live = rawget(_G, \"__ds_live\")\n"
+      .. "        if live and live.Flora and live.Flora.battleProps then\n"
+      .. "          live.Flora.battleProps(host, neighbors)\n"
+      .. "        end\n"
+      .. "      end)\n"
+    writeTracked(p, (src:gsub(a:gsub("%p", "%%%1"), function()
+      return add
+    end)))
+    say("battle scene spliced: stems stand in battle.")
+  end
+
   local function manageOne(base, ver, foundId, depth)
     -- STATE IS PER BASE now. One global state file was fine when there
     -- was one Dramatic Shape; switching to a fork made the old state
@@ -956,18 +1126,30 @@ local Flora = __dsMod("Flora", "__ds_flora_status")]]
     -- (1.3.0 is absol89's fork, which numbers itself independently)
     local TESTED = { ["1.3.0"] = true, ["1.5.4"] = true, ["1.5.5"] = true,
                      ["1.6.0"] = true, ["1.6.1"] = true, ["1.6.2"] = true,
+                     ["1.6.4"] = true,
                      ["1.7.0"] = true,
                      -- absol89's fork, the mainline since the deletion
-                     ["1.7.6"] = true }
+                     -- (1.7.8 and 1.8.0 added at the fork author's own
+                     -- request, issue #8; 1.8.2 per field reports)
+                     ["1.7.6"] = true, ["1.7.8"] = true,
+                     ["1.8.0"] = true, ["1.8.2"] = true }
     -- forks suffix their numbering (Dramaless ships as "1.6.2.ST"):
     -- when the leading x.y.z is a tested base, the suffix rides along
     local verBase = ver and ver:match("^(%d+%.%d+%.%d+)")
     if base and ver and not (TESTED[ver] or TESTED[verBase]) then
-      say(("Dramatic Shape %s is a version this patch has not been "
-           .. "tested against. NOT patching -- everything is left "
-           .. "stock. An update of Kanto in First Person will follow.")
+      -- HANDS OFF, fully (issue #8, absol89). 1.57.2 called unpatch()
+      -- here, and after a base reinstall had wiped the .pre-ceiling
+      -- backups, the ledger walk mistook two ENGINE files it had once
+      -- spliced -- ChunkMesher.lua, Structures.lua -- for its own
+      -- payloads and DELETED them, breaking the voxel mod outright.
+      -- An untested version now gets pure inaction: no patch, no
+      -- unpatch, no writes of any kind. If an older splice is present
+      -- it stays present (it worked when it was applied); cleanup is
+      -- only ever the user's explicit REMOVE PATCH, which is now
+      -- incapable of deleting files this mod did not create.
+      say(("Dramatic Shape %s is untested by this patch. Doing "
+           .. "NOTHING -- no files touched. An update will follow.")
           :format(ver))
-      unpatch(base)
       return
     end
 
@@ -1204,6 +1386,8 @@ local Flora = __dsMod("Flora", "__ds_flora_status")]]
         say("ceiling patch active (Dramatic Shape " .. ver .. ").")
       end
       spliceTallTrees(base)
+      spliceSunCast(base)
+      spliceBattleProps(base)
     elseif wantOn then
       apply(base, ver, vs)
     else

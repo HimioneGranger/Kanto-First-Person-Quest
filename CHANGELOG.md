@@ -1,5 +1,135 @@
 # Changelog
 
+## 1.60.0
+
+- **DRAMALESS SHAPE 1.6.4-hotfix: fully audited.** All seven splice
+  anchors verified present in the new build; 1.6.4 joins the tested
+  list. (1.6.2's declared conflict is still respected if its manifest
+  names this mod.)
+
+- **RAISED STEMS CAST REAL SHADOWS.** A one-call splice inside the sun
+  pass draws every trunk, stone stack and leafy hood -- current map
+  and neighbours -- into the base mod's shadow map, so the stems now
+  CAST like terrain instead of only receiving a blob. Falls back to
+  nothing (with a log line) on builds without the anchor.
+
+- **STEMS STAND IN BATTLE.** The 3D battle draws the host map's
+  terrain with the lifted rounds baked in, but never ran this module
+  -- so every raised tree floated for the length of a fight. A splice
+  after the battle's terrain draw (both sites) now draws the same
+  cached trunk, stone, hood and blob meshes, current map and
+  neighbours. The battle camera's framing remains the base mod's own.
+
+- **UMBRELLAS ARE FOR PEOPLE.** Pokeballs, boulders, fossils, item
+  sprites and loose pokemon no longer hold one in the rain -- sprite
+  names are checked against a non-human list; anything unnameable
+  keeps its brolly, since a dry stranger beats a wet townsperson.
+
+- **MOUNTAINS, ROUND THREE.** Seeds now answer to roofs too: authored
+  rock ids appearing inside city drawings were how Celadon's
+  structures kept wearing stone despite the 1.59.0 veto (doors still
+  only veto the flooded material, so cave mouths keep their cliffs).
+  And ridgelines break into actual peaks: any cell overtopping all
+  four neighbours (off the rim) carries a SUMMIT KNOB -- a half-
+  footprint inset block in the cell's own art -- so the massif reads
+  as mountains rather than level mesas.
+
+## 1.59.1 -- CRITICAL SAFETY RELEASE (issue #8)
+
+- **THIS MOD CAN NO LONGER DELETE FILES IT DID NOT CREATE.** The
+  reported failure was real and serious: with 1.57.2 installed,
+  reinstalling or updating the base voxel mod wiped this mod's
+  .pre-ceiling backups; the next boot saw an untested version, entered
+  unpatch(), and the ledger walk -- finding tracked engine files with
+  no backup -- mistook ChunkMesher.lua and Structures.lua for its own
+  payloads and deleted them, breaking the voxel mod from loading.
+  Full credit to absol89 for the exact diagnosis. Three changes:
+
+  1. **An untested base version now gets pure inaction.** No patch,
+     no unpatch, no writes of any kind -- the 1.57.2 behaviour of
+     "cleaning up" on an unknown version is gone. Cleanup only ever
+     happens via the user's explicit REMOVE PATCH.
+  2. **The ledger walk obeys a whitelist.** Only this mod's own
+     files (its five modules, its art, its audio) may ever be
+     deleted. Engine files are restored from backup when one exists,
+     marker-stripped in place when our splice text is present with no
+     backup, and LEFT ENTIRELY ALONE when pristine -- which is
+     exactly the state a base reinstall leaves them in.
+  3. **Tested list extended** with 1.7.8 and 1.8.0 at the fork
+     author's request, and 1.8.2 per field reports.
+
+- Users bitten by the bug: reinstall/re-import the base voxel mod
+  once more with THIS version (or newer) of Kanto in First Person
+  installed, and nothing will touch the restored files.
+
+## 1.59.0
+
+- **THE MASSIF BLANKETS ITS RANGES (community suggestion).** Peaks
+  retuned to cover the yellow-hued mountain areas solidly: every rock
+  cell now carries at least two courses (was one), the height gradient
+  steepens (STEP 3 -> 4), and small outcrops join in (MIN 4 -> 2) --
+  solid mountains rather than scattered spires, at the cost of some
+  horizon, as requested. And the horizon illustration's foot drops
+  from -120 to -1, so the painted ranges stand ON the ground plane
+  instead of sinking past it.
+
+- **BUILDINGS STOP INHERITING ROCK.** Two tightenings: flood REACH
+  drops 3 -> 2, and the building veto widens from a 1-cell to a 2-cell
+  radius around roof-class cells and doors -- the Celadon structures
+  that wore mountains (screenshot report) sat just outside the old
+  veto's reach.
+
+- **OBJECT SHADOWS (toggleable, on by default).** A soft radial blob
+  under every raised tree, boulder and converted hood, a whisker above
+  the ground so it never z-fights. One quad per object from a shared
+  16x16 falloff sprite: the difference between floating and standing,
+  at effectively no cost. Flips live.
+
+## 1.58.2
+
+- **THE HOOD, SECOND ATTEMPT.** 1.58.1's slab looked bad for two
+  findable reasons. The plaid banding was a bug: the leaf texture's
+  wrap mode defaulted to CLAMP, so any UV past 1 smeared the edge
+  texels into long streaks -- it repeats now, and the UVs are locked
+  to the world grid at one texel per unit, the same crunch as the
+  map's own art. And the shape was wrong: one smooth box where every
+  tree on the map is a stepped silhouette. The hood is now three
+  tiers -- tucked underside, full waist, inset cap -- each side shaded
+  by facing so the steps catch light, with a per-cell brightness nudge
+  so a grove of converted boulders is not one green wall.
+
+## 1.58.1
+
+- **BOULDER TREES turn the rock GREEN.** 1.58.0 gave boulders trunks
+  but left the rock art on top; now each converted round also wears a
+  leafy HOOD -- a five-faced cap one unit proud of the lifted rock, so
+  no grey peeks through, skinned in a coarse two-green voxel foliage
+  texture with dark pits, side faces shaded so the volume turns.
+  Trunk below, green crown above, leaves falling: the whole object is
+  a tree now. Still one toggle, still OFF by default, still flips
+  live; neighbours across the seams wear their hoods too, hazed with
+  distance like everything else out there.
+
+## 1.58.0
+
+- **LAVENDER FOG DIMS SPRITES AND FADES (issue #6, thanks absol89).**
+  Two defects, two fixes. The fog shells are world geometry drawn
+  before the cast pass, so sprites always punched through them: a new
+  "LAV VEIL" worldPresent pipeline -- registered by the same
+  documented route tilt-shift uses -- now lays a height-graded
+  lavender veil on the COMPOSITED world canvas, sprites and all,
+  before the UI. And the fog is eased, not switched: the envelope
+  climbs over ~2.5s entering Lavender and falls over ~4s leaving, the
+  shells and the veil riding the same curve, so the transition
+  breathes and the lingering exit reads as walking out of fog. The
+  debug note now shows the live envelope.
+
+- **BOULDER TREES (off by default).** A toggle that grows a bark trunk
+  under every lifted round, stone stacks included -- on rocky routes
+  it reads as wind-bent pines, and yes, they shed leaves. The round
+  itself keeps the map's own art: this reskins the support, not the
+  rock. Flips live; no remesh needed.
+
 ## 1.57.2
 
 - **THE INSTALLER STOPS CHOOSING A BASE.** It cannot see which family

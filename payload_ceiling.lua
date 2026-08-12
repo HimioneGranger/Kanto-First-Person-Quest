@@ -1,5 +1,5 @@
 -- The interior CEILING and RISERS: the room's missing upper storey.
--- payload-version: 26
+-- payload-version: 28
 --
 -- v1/v2 proved the concept: a flat lid at wall height (16) closed the
 -- room in first person.  v3 is the liveable version:

@@ -28,7 +28,11 @@ local Backdrop = {}
 
 local RADIUS = 900        -- far enough to read as distance, inside far plane
 local SEGMENTS = 64       -- around the full circle
-local Y_BOTTOM = -120     -- skirt below the horizon: no gap under the band
+local Y_BOTTOM = -1       -- the illustration's foot meets the world's
+                          -- ground plane (community request): painted
+                          -- ranges stand ON the ground instead of
+                          -- sinking past it; the deep skirt still
+                          -- seals everything below
 -- and a DEEP skirt below that, for the diorama and 3RD rungs. Looking at
 -- the world from above and outside, the eye clears the map's own edge and
 -- sees under it -- where the painted band simply stopped and the void

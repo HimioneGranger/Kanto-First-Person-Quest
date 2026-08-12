@@ -708,6 +708,59 @@ function MOUND.stoneImg()
   return T.stone or nil
 end
 
+-- the leafy skin the BOULDER TREES canopy wears: two greens in a
+-- coarse checker with dark pits, cut to read as voxel foliage at the
+-- same crunch as the map's own trees
+-- the shadow blob: a radial falloff into transparency, drawn dark
+function MOUND.shadowImg()
+  local T = MOUND.TRUNK
+  if T.simg ~= nil then return T.simg or nil end
+  local ok, img = pcall(function()
+    local W = 16
+    local data = love.image.newImageData(W, W)
+    for y = 0, W - 1 do
+      for x = 0, W - 1 do
+        local dx, dy = (x + 0.5) / W - 0.5, (y + 0.5) / W - 0.5
+        local d = math.sqrt(dx * dx + dy * dy) * 2
+        local a = math.max(0, 1 - d)
+        data:setPixel(x, y, 0, 0, 0, a * a * 0.55)
+      end
+    end
+    local i = love.graphics.newImage(data)
+    i:setFilter("linear", "linear")
+    return i
+  end)
+  T.simg = (ok and img) or false
+  return T.simg or nil
+end
+
+function MOUND.leafyImg()
+  local T = MOUND.TRUNK
+  if T.limg ~= nil then return T.limg or nil end
+  local ok, img = pcall(function()
+    local W, H = 8, 8
+    local data = love.image.newImageData(W, H)
+    local DK = { 0.16, 0.36, 0.14 }
+    local MD = { 0.26, 0.52, 0.20 }
+    local LT = { 0.42, 0.68, 0.28 }
+    for y = 0, H - 1 do
+      for x = 0, W - 1 do
+        local c = ((x + y) % 2 == 0) and MD or LT
+        if (x * 5 + y * 3) % 11 == 0 then c = DK end
+        data:setPixel(x, y, c[1], c[2], c[3], 1)
+      end
+    end
+    local i = love.graphics.newImage(data)
+    i:setFilter("nearest", "nearest")
+    -- REPEAT, or any UV past 1 clamp-smears the edge texels into long
+    -- streaks -- the plaid banding 1.58.1 shipped was exactly that
+    i:setWrap("repeat", "repeat")
+    return i
+  end)
+  T.limg = (ok and img) or false
+  return T.limg or nil
+end
+
 function MOUND.barkImg()
   local T = MOUND.TRUNK
   if T.img ~= nil then return T.img or nil end
@@ -777,10 +830,26 @@ function MOUND.buildTrunks(map, nbRects)
   -- new one as ghost stems until remeshes caught up.
   local rk = map.id or (map.def and map.def.id) or map
   local reg = (rawget(_G, "__ds_round_cells") or {})[rk] or {}
+  local cfgTrunk = config() or {}
   local tsid = tostring((map.def or {}).tileset or "")
   local boulderSet = MOUND.BOULDER_TILES[tsid] or {}
   local tV, tI, tQ = {}, {}, 0
   local sV, sI, sQ = {}, {}, 0
+  local cV, cI, cQ = {}, {}, 0
+  local shV, shI, shQ = {}, {}, 0
+  -- BLOB SHADOWS (toggleable): a soft dark square under every raised
+  -- object, a whisker above the ground so it never z-fights. Cheapest
+  -- possible grounding -- one quad each -- and the difference between
+  -- floating and standing is entirely this quad.
+  local function blob(bx, bz, by, half)
+    if cfgTrunk.shadows == false then return end
+    shV[#shV + 1] = { bx - half, by, bz - half, 0, 0, 1 }
+    shV[#shV + 1] = { bx + half, by, bz - half, 1, 0, 1 }
+    shV[#shV + 1] = { bx + half, by, bz + half, 1, 1, 1 }
+    shV[#shV + 1] = { bx - half, by, bz + half, 0, 1, 1 }
+    Voxel3D.pushQuad(shI, shQ)
+    shQ = shQ + 1
+  end
   local count = 0
   for key, lift in pairs(reg) do
     local cx, cy = key:match("^(-?%d+)|(-?%d+)$")
@@ -830,6 +899,15 @@ function MOUND.buildTrunks(map, nbRects)
                    [rk .. ":" .. (cx * 16 + 8) .. "|" .. (cy * 16 + 8)]
       if base == nil then goto continue end
       local boulder = okT and tile and boulderSet[tile] or false
+      -- BOULDER TREES (off by default): every lifted round grows a
+      -- bark trunk, and the rock itself turns GREEN -- a leafy hood, a
+      -- slightly oversize five-faced cap drawn snug over the lifted
+      -- round so the boulder art underneath never shows. With the
+      -- trunk beneath and leaves falling, the whole object IS a tree.
+      local hood = false
+      if cfgTrunk.bouldertrees == true and boulder then
+        boulder, hood = false, true
+      end
       if boulder then
         MOUND.TRUNK.bN = (MOUND.TRUNK.bN or 0) + 1
       else
@@ -840,6 +918,45 @@ function MOUND.buildTrunks(map, nbRects)
           -- the crown's underside, where a leaf lets go
           (not boulder) and (base + lift + 3) or nil }
       local mx, mz = cx * 16 + 8, cy * 16 + 8
+      blob(mx, mz, base + 0.35, boulder and 6.5 or 8.5)
+      if hood then
+        -- THE HOOD, second attempt: not a slab but a stepped voxel
+        -- canopy -- three tiers, wide in the middle and inset above,
+        -- the silhouette the map's own trees carry. UVs are locked to
+        -- the world grid at one texel per world unit (span/8 repeats
+        -- of the 8px leaf image), so the pattern reads as voxel
+        -- foliage instead of stretching into plaid, and each tier's
+        -- sides shade differently so the steps catch light. A per-cell
+        -- hash nudges the whole crown's brightness so a grove is not
+        -- one green wall.
+        local tone = 0.92 + 0.12 * hash01(cx, cy, 211)
+        local y0 = base + lift - 1
+        local function tier(hw2, ty0, ty1)
+          local cs = { { mx - hw2, mz - hw2 }, { mx + hw2, mz - hw2 },
+                       { mx + hw2, mz + hw2 }, { mx - hw2, mz + hw2 } }
+          local rep = hw2 * 2 / 8
+          local vrep = (ty1 - ty0) / 8
+          for i = 1, 4 do
+            local a, b = cs[i], cs[i % 4 + 1]
+            local sh = ((i == 1 or i == 4) and 1 or 0.82) * tone
+            cV[#cV + 1] = { b[1], ty1, b[2], rep, 0, sh }
+            cV[#cV + 1] = { a[1], ty1, a[2], 0, 0, sh }
+            cV[#cV + 1] = { a[1], ty0, a[2], 0, vrep, sh }
+            cV[#cV + 1] = { b[1], ty0, b[2], rep, vrep, sh }
+            Voxel3D.pushQuad(cI, cQ)
+            cQ = cQ + 1
+          end
+          cV[#cV + 1] = { mx - hw2, ty1, mz - hw2, 0, 0, 1.06 * tone }
+          cV[#cV + 1] = { mx + hw2, ty1, mz - hw2, rep, 0, 1.06 * tone }
+          cV[#cV + 1] = { mx + hw2, ty1, mz + hw2, rep, rep, 1.06 * tone }
+          cV[#cV + 1] = { mx - hw2, ty1, mz + hw2, 0, rep, 1.06 * tone }
+          Voxel3D.pushQuad(cI, cQ)
+          cQ = cQ + 1
+        end
+        tier(7.6, y0, y0 + 5)          -- underside, tucked in
+        tier(9.2, y0 + 4, y0 + 12)     -- the full waist
+        tier(6.4, y0 + 11, y0 + 16)    -- the inset cap
+      end
       if boulder then
         -- SOLID: a four-sided box in two courses, wide below, narrower
         -- above -- a stack of stones, not a panel
@@ -894,10 +1011,12 @@ function MOUND.buildTrunks(map, nbRects)
       ::continue::
     end
   end
+  local shm = shQ > 0 and Voxel3D.newMesh(shV, shI) or nil
+  local cm2 = cQ > 0 and Voxel3D.newMesh(cV, cI) or nil
   local tm = tQ > 0 and Voxel3D.newMesh(tV, tI) or nil
   local sm = sQ > 0 and Voxel3D.newMesh(sV, sI) or nil
   if not (tm or sm) then return nil end
-  return tm, sm, count
+  return tm, sm, count, cm2, shm
 end
 
 -- ------- MOUNTAIN PEAKS.
@@ -914,8 +1033,14 @@ end
 -- authored upright class AND not walkable AND outdoors AND not in a
 -- connection band. No stamps, no registry -- this derives from stable
 -- map data alone.
-MOUND.PEAK = { cache = {}, BAND = 16, STEP = 3, CAP = 12, MIN = 4,
-               REACH = 3 }
+-- Retuned after the community review (issue thread): the massif now
+-- BLANKETS its cluster -- every rock cell carries at least two courses
+-- so the yellow-hued ranges read as solid mountains rather than
+-- scattered spires, at the cost of some horizon (their words: worth
+-- it). MIN drops so small outcrops join in; REACH drops and the
+-- building veto widens so no structure ever inherits rock again.
+MOUND.PEAK = { cache = {}, BAND = 16, STEP = 4, CAP = 12, MIN = 2,
+               REACH = 2 }
 MOUND.PEAK_TILES = {
   OVERWORLD = { [2] = true, [36] = true },
 }
@@ -963,9 +1088,36 @@ function MOUND.buildPeaks(map)
               -- Seeds (authored rock ids) are immune; only the flooded
               -- second material must prove itself.
               local veto = false
-              if not pool[tile] then
-                for dy = -1, 1 do
-                  for dx = -1, 1 do
+              -- SEEDS answer to roofs now as well (Celadon report:
+              -- authored rock ids appear in city drawings, so seed
+              -- immunity let structures wear stone). Doors still only
+              -- veto the flooded material -- a cave mouth's door sits
+              -- against real cliff and must not bald it.
+              do
+                for dy = -2, 2 do
+                  for dx = -2, 2 do
+                    if not veto and (dx ~= 0 or dy ~= 0) then
+                      local okN, t2 = pcall(function()
+                        if map.cellTile then
+                          return map:cellTile(cx + dx, cy + dy)
+                        end
+                        return map:tileAt((cx + dx) * 2,
+                                          (cy + dy) * 2 + 1)
+                      end)
+                      if okN and t2 then
+                        local okC2, s2 = pcall(MOUND.TRUNK.ts.at, map,
+                          shapes, t2, (cx + dx) * 2, (cy + dy) * 2 + 1)
+                        if okC2 and s2 and s2.class == "roof" then
+                          veto = true
+                        end
+                      end
+                    end
+                  end
+                end
+              end
+              if not veto and not pool[tile] then
+                for dy = -2, 2 do
+                  for dx = -2, 2 do
                     if not veto and (dx ~= 0 or dy ~= 0) then
                       local okN, t2 = pcall(function()
                         if map.cellTile then
@@ -1110,7 +1262,7 @@ function MOUND.buildPeaks(map)
     local h1 = (c.cx * 73856093 + c.cy * 19349663) % 4
     local h2 = (c.cx * 2654435761 + c.cy * 40503) % 7
     local spire = (h2 == 0) and 3 or 0
-    c.bands = math.min(1 + d * MOUND.PEAK.STEP + h1 + spire,
+    c.bands = math.min(2 + d * MOUND.PEAK.STEP + h1 + spire,
                        MOUND.PEAK.CAP)
     c.high = c.top + c.bands * MOUND.PEAK.BAND
   end
@@ -1202,6 +1354,43 @@ function MOUND.buildPeaks(map)
             Voxel3D.pushQuad(indexMap, quads)
             quads = quads + 1
           end
+        end
+      end
+    end
+    -- SUMMIT KNOB: a cell overtopping all four neighbours (and off the
+    -- rim) carries one more inset block -- half footprint, one band --
+    -- so ridgelines break into actual peaks instead of level mesas
+    if (c.dist or 0) >= 1 then
+      local summit = true
+      for _, d in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
+        local nc = rock[(c.cx + d[1]) .. "|" .. (c.cy + d[2])]
+        if nc and nc.high >= c.high then summit = false end
+      end
+      if summit then
+        local x0k, z0k = c.cx * 16 + 4, c.cy * 16 + 4
+        local okS, t = pcall(function()
+          return map:tileAt(c.cx * 2, c.cy * 2)
+        end)
+        if okS and t then
+          local uv = { uvFor(map, t) }
+          local kt = c.high + MOUND.PEAK.BAND * 0.75
+          local cs = { { x0k, z0k }, { x0k + 8, z0k },
+                       { x0k + 8, z0k + 8 }, { x0k, z0k + 8 } }
+          for i = 1, 4 do
+            local a, b = cs[i], cs[i % 4 + 1]
+            verts[#verts + 1] = { b[1], kt, b[2], uv[1], uv[3], 0.72 }
+            verts[#verts + 1] = { a[1], kt, a[2], uv[2], uv[3], 0.72 }
+            verts[#verts + 1] = { a[1], c.high, a[2], uv[2], uv[4], 0.72 }
+            verts[#verts + 1] = { b[1], c.high, b[2], uv[1], uv[4], 0.72 }
+            Voxel3D.pushQuad(indexMap, quads)
+            quads = quads + 1
+          end
+          verts[#verts + 1] = { x0k, kt, z0k, uv[1], uv[3], 0.9 }
+          verts[#verts + 1] = { x0k + 8, kt, z0k, uv[2], uv[3], 0.9 }
+          verts[#verts + 1] = { x0k + 8, kt, z0k + 8, uv[2], uv[4], 0.9 }
+          verts[#verts + 1] = { x0k, kt, z0k + 8, uv[1], uv[4], 0.9 }
+          Voxel3D.pushQuad(indexMap, quads)
+          quads = quads + 1
         end
       end
     end
@@ -2662,7 +2851,28 @@ local function drawRain(state, cfg, px, pz, yaw, t, dt, raining)
         if umbrellaImg and cfg.umbrellas ~= false then
           local me = state.player
           for _, e in ipairs(state.entities or {}) do
-            if e ~= me and e.px and e.py then
+            local human = true
+            -- pokeballs, boulders, fossils and loose pokemon do not
+            -- carry umbrellas (field report). The sprite def names the
+            -- occupant; anything matching the non-human list stays
+            -- rained on. Unknown or unnameable sprites keep the brolly
+            -- -- a dry stranger beats a wet townsperson.
+            local okP, sp = pcall(function() return e:pose() end)
+            local nm = okP and sp and sp.def
+                       and tostring(sp.def.name or sp.def.id or "") or ""
+            if nm ~= "" then
+              nm = nm:upper()
+              for _, bad in ipairs({ "BALL", "BOULDER", "FOSSIL",
+                  "AMBER", "PAPER", "CLIPBOARD", "BOOK", "SNORLAX",
+                  "MONSTER", "SLOWBRO", "FEAROW", "PIDGEY", "SEEL",
+                  "ODDISH", "MACHOP", "VOLTORB", "CUBONE",
+                  "KANGASKHAN", "OMANYTE", "LAPRAS", "ZAPDOS",
+                  "ARTICUNO", "MOLTRES", "MEWTWO", "MEW", "PIKACHU",
+                  "CLEFAIRY", "JIGGLYPUFF", "MACHOKE", "GRIMER" }) do
+                if nm:find(bad, 1, true) then human = false break end
+              end
+            end
+            if human and e ~= me and e.px and e.py then
               local bob = math.sin((e.px + e.py) * 0.2 + t * 6) * 0.6
               Voxel3D.draw(partMesh, umbrellaImg,
                            Mat4.mul(Mat4.mul(
@@ -2704,24 +2914,37 @@ local function drawShafts(map, cfg, px, pz, t, raining)
   return shaftNote
 end
 
-local function drawFog(map, cfg, px, pz)
-  -- ---------- fog on the maps that deserve it
+local function drawFog(map, cfg, px, pz, dt)
+  -- ---------- fog on the maps that deserve it -- EASED now, not
+  -- switched. The envelope climbs over ~2.5s on entering a fog map
+  -- and falls over ~4s on leaving, so the transition breathes instead
+  -- of popping (issue #6). The lingering exit reads as walking OUT of
+  -- fog. The same envelope is published for the veil pipeline, which
+  -- is what actually dims the sprites: these world-space shells draw
+  -- before the cast pass and can never cover a billboard.
   local fogNote = ""
   local mapId = map.def and (map.def.id or map.def.name)
-  if cfg.fog ~= false and mapId and FOG_MAPS[tostring(mapId)] then
+  local want = (cfg.fog ~= false and mapId and FOG_MAPS[tostring(mapId)])
+               and 1 or 0
+  local env = MOUND.fogEnv or 0
+  if want > env then env = math.min(want, env + (dt or 0) * 0.4)
+  else env = math.max(want, env - (dt or 0) * 0.25) end
+  MOUND.fogEnv = env
+  _G.__ds_lavfog = env
+  if env > 0.01 then
     shellMesh = shellMesh or buildShells()
     if shellMesh then
       guarded(function()
         love.graphics.setDepthMode("lequal", false)
         -- the same shells as the cave dark, but pale: distance whitens
-        love.graphics.setColor(0.78, 0.76, 0.84, 0.55)
+        love.graphics.setColor(0.78, 0.76, 0.84, 0.55 * env)
         Voxel3D.draw(shellMesh, white(),
                      Mat4.mul(Mat4.translate(px, 0, pz),
                               Mat4.scale(1.6, 1, 1.6)))
         love.graphics.setColor(1, 1, 1, 1)
         love.graphics.setDepthMode("lequal", true)
       end)
-      fogNote = ", fog"
+      fogNote = (", fog %.2f"):format(env)
     end
   end
   return fogNote
@@ -4047,7 +4270,8 @@ function Flora.draw(state, atlasFor)
               end
             end
             local tslot = MOUND.TRUNK.nbcache[rkT]
-            if not tslot or tslot.n ~= regN2 or tslot.baseN ~= baseN2 then
+            if not tslot or tslot.n ~= regN2 or tslot.baseN ~= baseN2
+               or tslot.bt ~= (cfg.bouldertrees == true) then
               if tslot then
                 if tslot.trunks then
                   pcall(tslot.trunks.release, tslot.trunks)
@@ -4055,19 +4279,26 @@ function Flora.draw(state, atlasFor)
                 if tslot.stones then
                   pcall(tslot.stones.release, tslot.stones)
                 end
+                if tslot.hoods then
+                  pcall(tslot.hoods.release, tslot.hoods)
+                end
               end
-              local tm2, sm2 = MOUND.buildTrunks(nmap, nil)
-              tslot = { trunks = tm2, stones = sm2,
-                        n = regN2, baseN = baseN2 }
+              local tm2, sm2, _, hm2 = MOUND.buildTrunks(nmap, nil)
+              tslot = { trunks = tm2, stones = sm2, hoods = hm2,
+                        n = regN2, baseN = baseN2,
+                        bt = (cfg.bouldertrees == true) }
               MOUND.TRUNK.nbcache[rkT] = tslot
             end
-            if tslot.trunks or tslot.stones then
+            if tslot.trunks or tslot.stones or tslot.hoods then
               love.graphics.setColor(hr, hg, hb, 1)
               if tslot.trunks and MOUND.barkImg() then
                 Voxel3D.draw(tslot.trunks, MOUND.barkImg(), model)
               end
               if tslot.stones and MOUND.stoneImg() then
                 Voxel3D.draw(tslot.stones, MOUND.stoneImg(), model)
+              end
+              if tslot.hoods and MOUND.leafyImg() then
+                Voxel3D.draw(tslot.hoods, MOUND.leafyImg(), model)
               end
               love.graphics.setColor(1, 1, 1, 1)
             end
@@ -4135,14 +4366,24 @@ function Flora.draw(state, atlasFor)
     end
     local slot = MOUND.TRUNK.cache[map]
     if not slot or slot.n ~= regN or slot.baseN ~= baseN
-       or slot.nbN ~= #nbRects then
+       or slot.nbN ~= #nbRects
+       or slot.bt ~= (cfg.bouldertrees == true)
+       or slot.sh ~= (cfg.shadows ~= false) then
       if slot then
         if slot.trunks then pcall(slot.trunks.release, slot.trunks) end
         if slot.stones then pcall(slot.stones.release, slot.stones) end
+        if slot.hoods then pcall(slot.hoods.release, slot.hoods) end
+        if slot.shadows then
+          pcall(slot.shadows.release, slot.shadows)
+        end
       end
-      local tm, sm, n = MOUND.buildTrunks(map, nbRects)
-      slot = { trunks = tm, stones = sm, count = n or 0, n = regN,
+      local tm, sm, n, hm, shm = MOUND.buildTrunks(map, nbRects)
+      slot = { trunks = tm, stones = sm, hoods = hm, shadows = shm,
+               count = n or 0,
+               n = regN,
                baseN = baseN, nbN = #nbRects,
+               bt = (cfg.bouldertrees == true),
+               sh = (cfg.shadows ~= false),
                tN = MOUND.TRUNK.tN, bN = MOUND.TRUNK.bN,
                cells = MOUND.TRUNK.cells }
       MOUND.TRUNK.cache[map] = slot
@@ -4154,6 +4395,16 @@ function Flora.draw(state, atlasFor)
     end
     if slot.stones and MOUND.stoneImg() then
       guarded(function() Voxel3D.draw(slot.stones, MOUND.stoneImg(), nil) end)
+      drew = true
+    end
+    if slot.hoods and MOUND.leafyImg() then
+      guarded(function() Voxel3D.draw(slot.hoods, MOUND.leafyImg(), nil) end)
+      drew = true
+    end
+    if slot.shadows and MOUND.shadowImg() then
+      guarded(function()
+        Voxel3D.draw(slot.shadows, MOUND.shadowImg(), nil)
+      end)
       drew = true
     end
     if drew then
@@ -4260,7 +4511,7 @@ function Flora.draw(state, atlasFor)
   local vineNote = drawVines(map, cfg, px, pz, t, dt, canopySealed,
                              movedThisFrame or 0)
   local shaftNote = drawShafts(map, cfg, px, pz, t, raining)
-  local fogNote = drawFog(map, cfg, px, pz)
+  local fogNote = drawFog(map, cfg, px, pz, dt)
 
 
   -- CAVE DARKNESS removed. It drew nested shells to close the walls in,
@@ -4324,6 +4575,7 @@ function Flora.invalidate()
   for _, slot in pairs(MOUND.TRUNK.nbcache) do
     if slot.trunks then pcall(slot.trunks.release, slot.trunks) end
     if slot.stones then pcall(slot.stones.release, slot.stones) end
+    if slot.hoods then pcall(slot.hoods.release, slot.hoods) end
   end
   MOUND.TRUNK.nbcache = {}
   for _, slot in pairs(MOUND.PEAK.cache) do
@@ -4344,6 +4596,78 @@ function Flora.invalidate()
     if sc then pcall(sc.stop, sc) end
   end
   MOUND.AMB.srcs = {}
+end
+
+-- THE SUN SEES THE STEMS. Called from a small splice inside the sun
+-- pass: every mesh this module stands up -- trunks, stone stacks,
+-- leafy hoods, current map and neighbours -- is drawn into the shadow
+-- map, so raised trees now CAST like the terrain does instead of only
+-- receiving a blob.
+function Flora.castShadows(state, ShadowMap, Mat4x)
+  local map = state and state.map
+  if not map then return end
+  local slot = MOUND.TRUNK.cache[map]
+  if slot then
+    for _, k in ipairs({ "trunks", "stones", "hoods" }) do
+      if slot[k] then
+        pcall(ShadowMap.draw, slot[k], MOUND.barkImg(), nil)
+      end
+    end
+  end
+  for _, nb in ipairs(state.neighbors or {}) do
+    local rkT = (nb.map and (nb.map.id or (nb.map.def and nb.map.def.id)))
+                or nb.map
+    local ts = MOUND.TRUNK.nbcache[rkT]
+    if ts then
+      local model = Mat4x.translate(nb.ox or 0, 0, nb.oy or 0)
+      for _, k in ipairs({ "trunks", "stones", "hoods" }) do
+        if ts[k] then
+          pcall(ShadowMap.draw, ts[k], MOUND.barkImg(), model)
+        end
+      end
+    end
+  end
+end
+
+-- THE STEMS STAND IN BATTLE. The battle scene draws the host map's
+-- terrain -- lifted rounds baked in -- but never ran this module, so
+-- every raised tree floated for the length of a fight. Called from a
+-- splice after the battle's terrain draw; the caches are the same ones
+-- the overworld built moments before the fight, so this costs nothing
+-- to assemble.
+function Flora.battleProps(host, neighbors)
+  local slot = MOUND.TRUNK.cache[host]
+  if slot then
+    if slot.trunks and MOUND.barkImg() then
+      pcall(Voxel3D.draw, slot.trunks, MOUND.barkImg(), nil)
+    end
+    if slot.stones and MOUND.stoneImg() then
+      pcall(Voxel3D.draw, slot.stones, MOUND.stoneImg(), nil)
+    end
+    if slot.hoods and MOUND.leafyImg() then
+      pcall(Voxel3D.draw, slot.hoods, MOUND.leafyImg(), nil)
+    end
+    if slot.shadows and MOUND.shadowImg() then
+      pcall(Voxel3D.draw, slot.shadows, MOUND.shadowImg(), nil)
+    end
+  end
+  for _, nb in ipairs(neighbors or {}) do
+    local rkT = (nb.map and (nb.map.id or (nb.map.def and nb.map.def.id)))
+                or nb.map
+    local ts = MOUND.TRUNK.nbcache[rkT]
+    if ts then
+      local model = Mat4.translate(nb.ox or 0, 0, nb.oy or 0)
+      if ts.trunks and MOUND.barkImg() then
+        pcall(Voxel3D.draw, ts.trunks, MOUND.barkImg(), model)
+      end
+      if ts.stones and MOUND.stoneImg() then
+        pcall(Voxel3D.draw, ts.stones, MOUND.stoneImg(), model)
+      end
+      if ts.hoods and MOUND.leafyImg() then
+        pcall(Voxel3D.draw, ts.hoods, MOUND.leafyImg(), model)
+      end
+    end
+  end
 end
 
 -- live registration: the installer hot-swaps refreshed modules
