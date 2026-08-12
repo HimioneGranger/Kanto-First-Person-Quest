@@ -8,3 +8,19 @@ Thumbs.db
 *.swp
 .idea/
 .vscode/
+
+# local credentials, ROMs, saves, generated caches, and Quest build outputs
+.env
+.env.*
+!.env.example
+*.gb
+*.gbc
+*.gba
+*.sav
+*.srm
+*.apk
+baseroms/
+generated/
+cache/
+dist/
+.quest-package-stage/

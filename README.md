@@ -1,5 +1,10 @@
 # Kanto in First Person — Interiors and Tweaks
 
+> **Quest-maintained fork.** Original mod by **briddsy / mrmushrooms11**.
+> This branch is maintained for standalone Meta Quest VR and is not claimed to
+> have been tested or supported by the original creator. See
+> [QUEST_PORT.md](QUEST_PORT.md) and [PERMISSION.md](PERMISSION.md).
+
 A companion mod for the **Dramatic Shape Voxel Mod** that finishes Kanto's
 first-person view.
 

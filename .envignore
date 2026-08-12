@@ -1,0 +1,14 @@
+# Never include local credentials or user-owned game data in shared artifacts.
+.env
+.env.*
+*.gb
+*.gbc
+*.gba
+*.sav
+*.srm
+*.apk
+baseroms/
+generated/
+cache/
+dist/
+.quest-package-stage/
