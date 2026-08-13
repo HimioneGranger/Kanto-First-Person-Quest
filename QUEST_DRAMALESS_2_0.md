@@ -56,3 +56,20 @@ explicit REMOVE PATCH path restores every base-owned file byte-for-byte.
 No ROM, save, generated cache, APK, or commercial game data belongs in this
 repository or package. The user's normal Gen1Recomp ROM-import workflow is
 unchanged.
+
+## q7 physical acceptance
+
+Quest 3 testing accepted exact source commit `1352b4c` and deterministic ZIP
+SHA-256 `9A67A4190C646EE37692A6FA6C600B7D0E26099052D7C8C4E5E538C7E1F61D68`
+as the known-good q7 package:
+
+- Route 8 retained q6's clear wide battle camera.
+- Route 12 used the corrected water stage and wide camera as intended.
+- An unaffected Route 5 battle preserved its world stage, stereo and controls.
+- The physical Pokedex initially held one stale exploration frame, then
+  refreshed to the current battle UI when the move menu appeared. This is
+  tracked as low-priority Dramaless capture timing and is not an arena-patch
+  regression.
+
+Tag `kanto-quest-1.60.0-q7-accepted` identifies this complete physical arena
+milestone. q6 remains tagged as an archival Route 8 rollback.
