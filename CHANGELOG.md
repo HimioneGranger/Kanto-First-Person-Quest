@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.60.0-quest.4
+
+- **ANDROID PHYSICSFS ZIP-ORIGIN FIX.** The physical Quest importer also
+  rejected q3 after Android SAF copied and verified all 16,083,540 bytes.
+  q4 retains the same audited source but uses Windows `bsdtar` to reproduce the
+  Unix-origin ZIP headers of the known-working official archive. It omits only
+  the explicit root-directory record so fixed timestamps remain deterministic;
+  all payload paths remain under `ds_fp_ceiling/`.
+
 ## 1.60.0-quest.3
 
 - **QUEST IMPORTER PACKAGE FIX.** The q2 source passed all Lua, live-patch,

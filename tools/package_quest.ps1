@@ -1,5 +1,5 @@
 param(
-  [string]$Output = "dist/KANTO_FIRST_PERSON-1.60.0-quest.3.zip"
+  [string]$Output = "dist/KANTO_FIRST_PERSON-1.60.0-quest.4.zip"
 )
 
 $ErrorActionPreference = "Stop"
@@ -32,7 +32,7 @@ if ($forbidden) {
 $manifest = Get-Content -LiteralPath (Join-Path $payload 'manifest.json') -Raw |
   ConvertFrom-Json
 if ($manifest.id -ne 'ds_fp_ceiling' -or
-    $manifest.version -ne '1.60.0-quest.3') {
+    $manifest.version -ne '1.60.0-quest.4') {
   throw 'Unexpected manifest identity/version'
 }
 
@@ -40,7 +40,7 @@ New-Item -ItemType Directory -Path (Split-Path $outputPath) -Force | Out-Null
 if (Test-Path -LiteralPath $outputPath) {
   Remove-Item -LiteralPath $outputPath -Force
 }
-$sevenZip = (Get-Command 7z.exe -ErrorAction Stop).Source
+$tar = (Get-Command tar.exe -ErrorAction Stop).Source
 $fixedTime = [DateTime]::SpecifyKind([DateTime]'2000-01-01T00:00:00', 'Utc')
 foreach ($entry in @(Get-Item -LiteralPath $payload) +
     @(Get-ChildItem -LiteralPath $payload -Recurse -Force)) {
@@ -50,11 +50,11 @@ foreach ($entry in @(Get-Item -LiteralPath $payload) +
 }
 Push-Location $stage
 try {
-  # Let 7-Zip add the payload entries without emitting a root-directory entry.
-  # Older 7-Zip stores a changing NTFS access time on that one entry, making
-  # otherwise identical Quest packages non-deterministic.
-  & $sevenZip a -tzip -mx=9 -bd -bso0 -bsp0 $outputPath 'ds_fp_ceiling\*'
-  if ($LASTEXITCODE -ne 0) { throw "7-Zip failed with exit code $LASTEXITCODE" }
+  # bsdtar writes the Unix-origin ZIP headers used by the known-good upstream
+  # archive. Both Windows/FAT-origin q2 and q3 packages were rejected by the
+  # Quest Android PhysicsFS build even though desktop PhysicsFS accepted them.
+  & $tar -a -cf $outputPath 'ds_fp_ceiling/*'
+  if ($LASTEXITCODE -ne 0) { throw "bsdtar failed with exit code $LASTEXITCODE" }
 } finally {
   Pop-Location
 }

@@ -1,9 +1,11 @@
 # Dramaless 2.0 Quest compatibility
 
 This Quest fork adapts Kanto in First Person 1.60.0 to the accepted Dramaless
-2.0 Quest q3 core baseline at commit `1b3ac8c`. Kanto package q3 retains the
-q2 source adaptation and changes only the importer-facing archive format after
-the physical Quest rejected q2's PowerShell-written flat-root ZIP.
+2.0 Quest q3 core baseline at commit `1b3ac8c`. Kanto packages q3 and q4 retain
+the q2 source adaptation and change only importer-facing archive format. q3
+restored the upstream folder layout; after Android still rejected its
+Windows/FAT-origin headers, q4 reproduces the Unix-origin header style of the
+known-working official archive.
 
 ## Audited seams
 
