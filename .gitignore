@@ -24,3 +24,4 @@ generated/
 cache/
 dist/
 .quest-package-stage/
+tools/love_*/result.txt

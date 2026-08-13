@@ -106,6 +106,30 @@ local SCENE_ADD = [[  -- the distant horizon (lib/Backdrop.lua): before the terr
   -- blades sit on ground that already exists
   pcall(Flora.draw, state, atlasFor)]]
 
+-- Dramaless 2.0 keeps the same primary terrain draw but culls each neighbour
+-- inside the loop.  Match that complete block explicitly so the companion's
+-- transparent/detail passes remain after every admitted terrain mesh instead
+-- of landing between the local map and its neighbours.
+local SCENE_2_ANCHOR = [[  Voxel3D.draw(terrain, atlasFor(state.map), nil)
+  for i, nb in ipairs(state.neighbors or {}) do
+    if withinRenderDistance({px = nb.ox, py = nb.oy, isPlayer = false}) then -- added in 2.0.0
+      Voxel3D.draw(nbMesh[i], atlasFor(nb.map),
+                 Mat4.translate(nb.ox, 0, nb.oy))
+    end
+  end]]
+local SCENE_2_ADD = [[  -- the distant horizon and sky: depth writes stay off,
+  -- so every admitted local or neighbouring terrain surface draws over them
+  pcall(Backdrop.draw, state)
+  pcall(SkyLayer.draw, state)
+
+]] .. SCENE_2_ANCHOR .. [[
+
+
+  -- interiors and ground detail run only after the complete admitted terrain
+  -- set, preserving Dramaless 2.0's render-distance and depth ordering
+  pcall(Ceiling.draw, state, atlasFor)
+  pcall(Flora.draw, state, atlasFor)]]
+
 -- The jump lives in the first-person rig: one term added to the eye's
 -- height expression, and the require that reaches it.
 local FP_REQ_ANCHOR = 'local Voxel3D = V.require("Voxel3D")'
@@ -486,6 +510,18 @@ mod.options:define({
     return okS and real == save
   end
 
+  -- Any in-place edit of a base-owned source gets one pristine backup before
+  -- the first write.  The ledger can then restore the exact source instead of
+  -- relying on a marker stripper to understand every historical splice.
+  local function backupInPlace(path, source)
+    if not source or not inSave(path) then return true end
+    local pre = path .. ".pre-ceiling"
+    if read(pre) then return true end
+    -- `source` is often CRLF-normalized for anchor matching. Always prefer the
+    -- still-untouched raw file so explicit removal is byte-for-byte reversible.
+    return write(pre, read(path) or source)
+  end
+
   -- splice `add` over the FIRST plain-text occurrence of `anchor`
   local function splice(src, anchor, add)
     local s, e = src:find(anchor, 1, true)
@@ -595,6 +631,9 @@ mod.options:define({
     local exact = splice(vs, SCENE_ANCHOR, SCENE_ADD)
     if exact then return exact, "block" end
 
+    local exact2 = splice(vs, SCENE_2_ANCHOR, SCENE_2_ADD)
+    if exact2 then return exact2, "2.0 block" end
+
     -- otherwise find the terrain draw itself, whatever its arguments are
     local line = vs:match("[^\n]-Voxel3D%.draw%(%s*terrain[^\n]*")
     if not line then return nil end
@@ -645,6 +684,7 @@ mod.options:define({
             ",\n%s+%-%- ds_fp_ceilings.-return.-end%)%(%) }", " }", 1)
           if stripped ~= st and stripped:find("{ quads = tpl.quads,"
                .. " mx = cx %* 16 %+ 8, mz = cy %* 16 %+ 8 }") then
+            backupInPlace(stPath, st)
             st = stripped
             write(stPath, st)
           end
@@ -677,6 +717,7 @@ mod.options:define({
           .. "                  _r[_k][cx .. \"|\" .. cy] = _l end\n"
           .. "                _G.__ds_tree_lift = true\n"
           .. "                return _l end)() }"
+        backupInPlace(stPath, st)
         writeTracked(stPath, (st:gsub(stOld:gsub("%p", "%%%1"), function()
             return stNew
           end, 1)))
@@ -714,7 +755,10 @@ mod.options:define({
             .. "                end)() }"
           local applied = st2:gsub(tombOld:gsub("%p", "%%%1"),
                                    function() return tombNew end, 1)
-          if applied ~= st2 then writeTracked(stPath, applied) end
+          if applied ~= st2 then
+            backupInPlace(stPath, st2)
+            writeTracked(stPath, applied)
+          end
         end
         local cmPath = base .. "/lib/ChunkMesher.lua"
         local cm = readSrc(cmPath)
@@ -723,6 +767,7 @@ mod.options:define({
         -- strip our line back to stock so the current edition applies
         if cm and cm:find("st.lift", 1, true)
            and not cm:find("__ds_round_base", 1, true) then
+          backupInPlace(cmPath, cm)
           cm = cm:gsub("s2%[2%] = c%[2%] %+ %(st%.lift or 0%)[^\n]*\n",
                        "s2[2] = c[2]\n", 1)
           write(cmPath, cm)
@@ -744,6 +789,7 @@ mod.options:define({
             .. ".-\n          end\n",
             "s2[2] = c[2]\n", 1)
           if stripped ~= cm then
+            backupInPlace(cmPath, cm)
             cm = stripped
             write(cmPath, cm)
           end
@@ -757,6 +803,7 @@ mod.options:define({
           local fcOld = "local IDLE_SLICE = 0.005\n"
           if cm and cm:find(fcOld, 1, true)
              and not cm:find("fastchunks", 1, true) then
+            backupInPlace(cmPath, cm)
             cm = cm:gsub("local IDLE_SLICE = 0%.005\n",
               "local IDLE_SLICE = 0.005 + ((function()\n"
               .. "  local _c = rawget(_G, \"__ds_ceiling_config\")\n"
@@ -768,10 +815,7 @@ mod.options:define({
         end
         if cm and cm:find(cmOld, 1, true)
            and not cm:find("st.lift", 1, true) then
-          local inPlaceCm = inSave(cmPath)
-          if inPlaceCm and not read(cmPath .. ".pre-ceiling") then
-            write(cmPath .. ".pre-ceiling", cm)
-          end
+          backupInPlace(cmPath, cm)
           writeTracked(cmPath, (cm:gsub(
             "          s2%[2%] = c%[2%]\n",
             "          s2[2] = c[2] + (st.lift or 0)"
@@ -841,8 +885,7 @@ local Flora = __dsMod("Flora", "__ds_flora_status")]]
     local inPlace = inSave(base .. "/manifest.json")
     if inPlace then
       -- the originals are about to be replaced where they stand; keep them
-      local pre = vsPath .. ".pre-ceiling"
-      if not read(pre) then write(pre, vs) end
+      backupInPlace(vsPath, vs)
     end
     if not (writeTracked(base .. "/lib/Ceiling.lua", payload)
             and write(vsPath, vsPatched)) then
@@ -867,8 +910,7 @@ local Flora = __dsMod("Flora", "__ds_flora_status")]]
       fp2 = fpS or fp2
       if fp2 then
         if inPlace then
-          local pre = fpPath .. ".pre-ceiling"
-          if not read(pre) then write(pre, fpSrc) end
+          backupInPlace(fpPath, fpSrc)
         end
         if writeTracked(base .. "/lib/Jump.lua", jump) then write(fpPath, fp2) end
       else
@@ -901,7 +943,10 @@ local Flora = __dsMod("Flora", "__ds_flora_status")]]
     _G.__ds_backdrop_path = chosenArt(base, read)
     _G.__ds_posters_dir = base .. "/lib/"
     -- the options row is a nicety: without it the ceiling is simply ON
-    local mainSrc = read(mainPath)
+    -- Match the settings row with the same CRLF normalization used for the
+    -- renderer sources. Quest packages built on Windows commonly carry CRLF.
+    local mainRaw = read(mainPath)
+    local mainSrc = mainRaw and mainRaw:gsub("\r\n", "\n")
     local mainAnchor = firstAnchor(mainSrc, REQ_ANCHORS)
     local mainPatched = mainSrc and mainAnchor
       and splice(mainSrc, mainAnchor,
@@ -909,8 +954,7 @@ local Flora = __dsMod("Flora", "__ds_flora_status")]]
     mainPatched = mainPatched and splice(mainPatched, ROW_ANCHOR, ROW_ADD)
     if mainPatched then
       if inPlace then
-        local pre = mainPath .. ".pre-ceiling"
-        if not read(pre) then write(pre, mainSrc) end
+        backupInPlace(mainPath, mainRaw or mainSrc)
       end
       write(mainPath, mainPatched)
     else
@@ -961,6 +1005,36 @@ local Flora = __dsMod("Flora", "__ds_flora_status")]]
     return t
   end
   local function unpatch(base)
+    local vsPath = base .. "/lib/VoxelScene.lua"
+    local mainPath = base .. "/main.lua"
+    local ceilPath = base .. "/lib/Ceiling.lua"
+    local fpPath = base .. "/lib/FirstPerson.lua"
+    local inPlace = inSave(base .. "/manifest.json")
+    local coreRestored = false
+
+    -- VoxelScene is also recorded by the later sun-shadow splice. If the
+    -- generic ledger consumes its backup first, the historical restore block
+    -- loses the gate that also restores main.lua and FirstPerson.lua. Restore
+    -- this core group atomically before walking the ledger.
+    if inPlace then
+      local preVs = read(vsPath .. ".pre-ceiling")
+      if preVs and not preVs:find(MARK, 1, true) then
+        write(vsPath, preVs)
+        remove(vsPath .. ".pre-ceiling")
+        local preMain = read(mainPath .. ".pre-ceiling")
+        if preMain then
+          write(mainPath, preMain)
+          remove(mainPath .. ".pre-ceiling")
+        end
+        local preFp = read(fpPath .. ".pre-ceiling")
+        if preFp then
+          write(fpPath, preFp)
+          remove(fpPath .. ".pre-ceiling")
+        end
+        coreRestored = true
+      end
+    end
+
     -- the ledger first -- everything we ever wrote -- under the new
     -- law: our own files may be deleted, engine files may only be
     -- restored, stripped, or left be
@@ -993,10 +1067,6 @@ local Flora = __dsMod("Flora", "__ds_flora_status")]]
       end
       remove(LEDGER)
     end
-    local vsPath = base .. "/lib/VoxelScene.lua"
-    local mainPath = base .. "/main.lua"
-    local ceilPath = base .. "/lib/Ceiling.lua"
-    local inPlace = inSave(base .. "/manifest.json")
     if not inPlace then
       -- shadow install: our save-directory copies ARE the patch
       for _, p in ipairs({ vsPath, mainPath, ceilPath,
@@ -1010,6 +1080,13 @@ local Flora = __dsMod("Flora", "__ds_flora_status")]]
       end
       remove(STATE_FILE)
       say("ceiling patch removed (shadow copies cleared)." .. laterNote())
+      return
+    end
+    if coreRestored then
+      remove(base .. "/lib/Jump.lua")
+      remove(ceilPath)
+      remove(STATE_FILE)
+      say("ceiling patch removed (originals restored)." .. laterNote())
       return
     end
     local preVs = read(vsPath .. ".pre-ceiling")
@@ -1047,9 +1124,7 @@ local Flora = __dsMod("Flora", "__ds_flora_status")]]
       say("sun-cast anchor not found; stems will not cast this build.")
       return
     end
-    if not read(p .. ".pre-ceiling") and inSave(p) then
-      write(p .. ".pre-ceiling", src)
-    end
+    backupInPlace(p, src)
     local add = a
       .. "  -- ds_fp_ceilings __ds_sun_cast: companion stems cast too\n"
       .. "  pcall(function()\n"
@@ -1067,25 +1142,34 @@ local Flora = __dsMod("Flora", "__ds_flora_status")]]
   -- THE BATTLE SPLICE: the same stems stand during 3D battles, drawn
   -- right after the battle's own terrain -- both terrain sites.
   spliceBattleProps = function(base)
-    local p = base .. "/lib/BattleScene.lua"
-    local src = readSrc(p)
-    if not src or src:find("__ds_btl_props", 1, true) then return end
-    local a = "      Voxel3D.draw(terrain, atlasFor(host), nil)\n"
-    if not src:find(a, 1, true) then
+    local p, src, a
+    for _, candidate in ipairs({
+      { base .. "/lib/VoxelBattleScene.lua",
+        "    Voxel3D.draw(terrain, atlasFor(host), nil)\n" },
+      { base .. "/lib/BattleScene.lua",
+        "      Voxel3D.draw(terrain, atlasFor(host), nil)\n" },
+    }) do
+      local candidateSrc = readSrc(candidate[1])
+      if candidateSrc and candidateSrc:find(candidate[2], 1, true) then
+        p, src, a = candidate[1], candidateSrc, candidate[2]
+        break
+      end
+    end
+    if not src then
       say("battle anchor not found; stems sit battles out this build.")
       return
     end
-    if not read(p .. ".pre-ceiling") and inSave(p) then
-      write(p .. ".pre-ceiling", src)
-    end
+    if src:find("__ds_btl_props", 1, true) then return end
+    backupInPlace(p, src)
+    local indent = a:match("^(%s*)") or ""
     local add = a
-      .. "      -- ds_fp_ceilings __ds_btl_props\n"
-      .. "      pcall(function()\n"
-      .. "        local live = rawget(_G, \"__ds_live\")\n"
-      .. "        if live and live.Flora and live.Flora.battleProps then\n"
-      .. "          live.Flora.battleProps(host, neighbors)\n"
-      .. "        end\n"
-      .. "      end)\n"
+      .. indent .. "-- ds_fp_ceilings __ds_btl_props\n"
+      .. indent .. "pcall(function()\n"
+      .. indent .. "  local live = rawget(_G, \"__ds_live\")\n"
+      .. indent .. "  if live and live.Flora and live.Flora.battleProps then\n"
+      .. indent .. "    live.Flora.battleProps(host, neighbors)\n"
+      .. indent .. "  end\n"
+      .. indent .. "end)\n"
     writeTracked(p, (src:gsub(a:gsub("%p", "%%%1"), function()
       return add
     end)))
@@ -1132,7 +1216,10 @@ local Flora = __dsMod("Flora", "__ds_flora_status")]]
                      -- (1.7.8 and 1.8.0 added at the fork author's own
                      -- request, issue #8; 1.8.2 per field reports)
                      ["1.7.6"] = true, ["1.7.8"] = true,
-                     ["1.8.0"] = true, ["1.8.2"] = true }
+                     ["1.8.0"] = true, ["1.8.2"] = true,
+                     -- Quest fork: audited against Dramaless 2.0 q3's
+                     -- guarded scene, first-person, mesher and shadow seams
+                     ["2.0.0"] = true }
     -- forks suffix their numbering (Dramaless ships as "1.6.2.ST"):
     -- when the leading x.y.z is a tested base, the suffix rides along
     local verBase = ver and ver:match("^(%d+%.%d+%.%d+)")

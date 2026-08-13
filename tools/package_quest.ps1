@@ -1,5 +1,5 @@
 param(
-  [string]$Output = "dist/KANTO_FIRST_PERSON-1.60.0-quest.1.zip"
+  [string]$Output = "dist/KANTO_FIRST_PERSON-1.60.0-quest.2.zip"
 )
 
 $ErrorActionPreference = "Stop"
@@ -30,7 +30,7 @@ if ($forbidden) {
 $manifest = Get-Content -LiteralPath (Join-Path $stage 'manifest.json') -Raw |
   ConvertFrom-Json
 if ($manifest.id -ne 'ds_fp_ceiling' -or
-    $manifest.version -ne '1.60.0-quest.1') {
+    $manifest.version -ne '1.60.0-quest.2') {
   throw 'Unexpected manifest identity/version'
 }
 

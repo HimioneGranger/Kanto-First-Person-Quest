@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.60.0-quest.2
+
+- **DRAMALESS 2.0 QUEST SUPPORT.** Audited the accepted
+  `2.0.0-quest.3` scene, first-person, settings, structure, mesher, shadow and
+  payload-API seams. Version `2.0.0` is admitted only after those focused
+  contracts pass; unknown versions still perform no base writes.
+- **CORRECT 2.0 DRAW ORDER.** The scene patch now matches Dramaless 2.0's
+  complete render-distance-guarded neighbour block. Horizon/sky stay behind
+  terrain, while ceilings/flora run after every admitted neighbour mesh.
+- **2.0 BATTLE PROVIDER.** Optional Kanto flora now targets
+  `VoxelBattleScene.lua` as well as the older `BattleScene.lua` path without
+  absorbing StadiumBattleFX host, importer, camera, selector or lifecycle code.
+- **EXACT ROLLBACK BACKUPS.** Base-owned Structures, ChunkMesher and battle
+  provider files now receive a pristine in-place backup before their first
+  write, matching the existing VoxelScene, main and FirstPerson protection.
+  The live apply/idempotence/remove/refusal test restores every q3 engine source
+  byte-for-byte.
+
 ## 1.60.0
 
 - **DRAMALESS SHAPE 1.6.4-hotfix: fully audited.** All seven splice
