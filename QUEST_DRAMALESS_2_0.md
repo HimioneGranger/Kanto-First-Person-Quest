@@ -5,9 +5,10 @@ This Quest fork adapts Kanto in First Person 1.60.0 to the accepted Dramaless
 the q2 source adaptation and change only importer-facing archive format. q3
 restored the upstream folder layout; after Android still rejected its
 Windows/FAT-origin headers, q4 reproduces the Unix-origin header style of the
-known-working official archive. q5 retains that package format and removes one
-optional battle-only flora injection after physical Route 8 evidence showed it
-occluding Dramaless 2.0's native battle camera.
+known-working official archive. q5 tested removal of one optional battle-only
+flora injection, but physical logs proved the removal succeeded while the same
+Route 8 obstruction remained. q6 supersedes that rejected diagnosis with a
+per-arena camera-clearance fix.
 
 ## Audited seams
 
@@ -23,23 +24,26 @@ occluding Dramaless 2.0's native battle camera.
 - `VoxelScene.lua` shadow pass: the water shadow draw remains an exact single
   match for Kanto's optional flora shadow hook.
 - Battle rendering moved from `BattleScene.lua` to `VoxelBattleScene.lua` in
-  Dramaless 2.0. q4 initially adapted the optional raised-flora hook to that
-  file, but repeatable Route 8 captures showed a large nearby world prop
-  covering the arena. q5 preserves the 2.0 provider exactly and removes only
-  q4's marked `__ds_btl_props` block from an upgraded installation. Older
-  tested `BattleScene.lua` providers retain the established raised-stem hook.
+  Dramaless 2.0. The optional raised-flora hook targets that provider so lifted
+  rounds keep their trunks, stone supports, hoods and shadows during battles.
+  q5 temporarily removed it, but device evidence proved the terrain canopy—not
+  the support draw—still blocked Route 8. q6 restores the support hook.
   StadiumBattleFX remains a separate host/importer and is not absorbed here.
+- `data/battle_arenas.lua`: Kanto's lifted Route 8 terrain intersects the
+  default telephoto rig, whose eye stands roughly five blocks from the arena.
+  q6 changes only Route 8 to Dramaless's existing authored `cam = "wide"` rig.
+  Global battle-camera constants, VR matrices and every other arena stay native.
 
 ## Safety and rollback
 
 Unknown versions retain the existing pure-refusal behavior. Version `2.0.0`
 is accepted only because the q3 anchor contract is checked by
 `tools/test_dramaless_2_0.py` before packaging. Base-owned Structures,
-ChunkMesher, VoxelScene, FirstPerson, and main sources receive pristine
-in-place backups before their first write. A battle-provider backup created by
-q4 is retained through q5's narrow cleanup, so the normal explicit REMOVE PATCH
-path still restores the original bytes. A fresh q5 install never writes or
-backs up Dramaless 2.0's native battle provider.
+ChunkMesher, VoxelScene, FirstPerson, main, the battle provider and battle arena
+data receive pristine in-place backups before their first write. q6 retains an
+existing q4/q5 battle backup and creates the arena-data backup only when its
+Route 8 override applies. The normal explicit REMOVE PATCH path restores every
+base-owned file byte-for-byte.
 
 No ROM, save, generated cache, APK, or commercial game data belongs in this
 repository or package. The user's normal Gen1Recomp ROM-import workflow is

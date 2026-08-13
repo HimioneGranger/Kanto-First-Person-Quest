@@ -658,7 +658,8 @@ mod.options:define({
   -- already patched took the "module updated" branch instead, so the
   -- splice never landed and the feature did nothing. Idempotent: each
   -- file is checked for its own marker before anything is written.
-  local spliceSunCast, spliceBattleProps   -- defined below manageOne's
+  local spliceSunCast, spliceBattleProps, spliceRoute8BattleCam
+                                           -- defined below manageOne's
                                            -- helpers; forward-declared
                                            -- so apply() closes over the
                                            -- LOCALS, not nil globals
@@ -921,6 +922,7 @@ local Flora = __dsMod("Flora", "__ds_flora_status")]]
     spliceTallTrees(base)
     spliceSunCast(base)
     spliceBattleProps(base, ver)
+    spliceRoute8BattleCam(base, ver)
     if sky then writeTracked(base .. "/lib/SkyLayer.lua", sky) end
     local flora = mod:read("payload_flora.lua")
     if flora then writeTracked(base .. "/lib/Flora.lua", flora) end
@@ -1002,6 +1004,9 @@ local Flora = __dsMod("Flora", "__ds_flora_status")]]
                .. "  pcall%(function%(%)\n.-\n  end%)\n", "", 1)
     t = t:gsub("      %-%- ds_fp_ceilings __ds_btl_props\n"
                .. "      pcall%(function%(%)\n.-\n      end%)\n", "")
+    t = t:gsub('  %["ROUTE_8"%] = { x = 25, y = 7, shape = "wide",'
+               .. ' cam = "wide" }, %-%- ds_fp_ceilings __ds_r8_wide',
+               '  ["ROUTE_8"] = { x = 25, y = 7, shape = "wide" },', 1)
     return t
   end
   local function unpatch(base)
@@ -1075,6 +1080,7 @@ local Flora = __dsMod("Flora", "__ds_flora_status")]]
                            base .. "/lib/Backdrop.lua",
                            base .. "/lib/SkyLayer.lua",
                            base .. "/lib/Flora.lua",
+                           base .. "/data/battle_arenas.lua",
                            base .. "/lib/backdrop.png" }) do
         if inSave(p) then remove(p) end
       end
@@ -1139,48 +1145,7 @@ local Flora = __dsMod("Flora", "__ds_flora_status")]]
     say("sun pass spliced: raised stems cast shadows.")
   end
 
-  -- The historical battle splice makes raised stems stand during older 3D
-  -- battles. Dramaless 2.0 owns a dedicated VoxelBattleScene and its native
-  -- framing proved correct on Quest before this companion injected the same
-  -- host-and-neighbour props a second time. In particular, that extra layer
-  -- can crowd the Route 8 camera. Preserve 2.0's provider exactly and remove
-  -- the q4 marker block from already-patched installs; older bases retain the
-  -- established BattleScene splice.
-  local function stripBattleProps(src)
-    if not src then return src, false end
-    for _, indent in ipairs({ "    ", "      " }) do
-      local block = indent .. "-- ds_fp_ceilings __ds_btl_props\n"
-        .. indent .. "pcall(function()\n"
-        .. indent .. "  local live = rawget(_G, \"__ds_live\")\n"
-        .. indent .. "  if live and live.Flora and live.Flora.battleProps then\n"
-        .. indent .. "    live.Flora.battleProps(host, neighbors)\n"
-        .. indent .. "  end\n"
-        .. indent .. "end)\n"
-      local first, last = src:find(block, 1, true)
-      if first then
-        return src:sub(1, first - 1) .. src:sub(last + 1), true
-      end
-    end
-    return src, false
-  end
-
   spliceBattleProps = function(base, ver)
-    local verBase = ver and ver:match("^(%d+%.%d+%.%d+)")
-    if verBase == "2.0.0" then
-      local p = base .. "/lib/VoxelBattleScene.lua"
-      local src = readSrc(p)
-      local clean, removed = stripBattleProps(src)
-      if removed then
-        if writeTracked(p, clean) then
-          say("Dramaless 2.0 battle flora splice removed; native battle "
-              .. "framing preserved.")
-        else
-          say("could not remove the Dramaless 2.0 battle flora splice.")
-        end
-      end
-      return
-    end
-
     local p, src, a
     for _, candidate in ipairs({
       { base .. "/lib/VoxelBattleScene.lua",
@@ -1213,6 +1178,34 @@ local Flora = __dsMod("Flora", "__ds_flora_status")]]
       return add
     end)))
     say("battle scene spliced: stems stand in battle.")
+  end
+
+  -- Dramaless' default telephoto battle rig stands roughly five blocks from
+  -- the arena. Once Kanto lifts Route 8's round terrain, that eye position is
+  -- underneath a canopy: the same giant brown/gray obstruction reproduced in
+  -- both q4 and q5. Dramaless already provides the `cam = "wide"` authoring
+  -- escape hatch for a stage whose long-lens eye intersects world geometry.
+  -- Apply it to Route 8 only; no global camera constants or VR matrices move.
+  spliceRoute8BattleCam = function(base, ver)
+    local verBase = ver and ver:match("^(%d+%.%d+%.%d+)")
+    if verBase ~= "2.0.0" then return end
+    local p = base .. "/data/battle_arenas.lua"
+    local src = readSrc(p)
+    if not src or src:find("__ds_r8_wide", 1, true) then return end
+    local old = '  ["ROUTE_8"] = { x = 25, y = 7, shape = "wide" },'
+    local new = '  ["ROUTE_8"] = { x = 25, y = 7, shape = "wide",'
+      .. ' cam = "wide" }, -- ds_fp_ceilings __ds_r8_wide'
+    local patched = splice(src, old, new)
+    if not patched then
+      say("Route 8 battle-camera anchor not found; leaving its native rig.")
+      return
+    end
+    backupInPlace(p, src)
+    if writeTracked(p, patched) then
+      say("Route 8 battle camera widened to clear Kanto's lifted terrain.")
+    else
+      say("could not apply the Route 8 battle-camera clearance fix.")
+    end
   end
 
   local function manageOne(base, ver, foundId, depth)
@@ -1514,6 +1507,7 @@ local Flora = __dsMod("Flora", "__ds_flora_status")]]
       spliceTallTrees(base)
       spliceSunCast(base)
       spliceBattleProps(base, ver)
+      spliceRoute8BattleCam(base, ver)
     elseif wantOn then
       apply(base, ver, vs)
     else

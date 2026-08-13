@@ -123,21 +123,30 @@ def main() -> None:
         "    Voxel3D.draw(terrain, atlasFor(host), nil)\n",
         "2.0 native-card battle terrain",
     )
-    preserve = source.find('if verBase == "2.0.0" then')
-    return_before_legacy = source.find("\n      return\n    end", preserve)
-    legacy_loop = source.find("for _, candidate in ipairs", preserve)
-    require(preserve >= 0, "Kanto patcher has no Dramaless 2.0 battle guard")
     require(
-        'local clean, removed = stripBattleProps(src)' in source,
-        "Kanto patcher cannot remove the q4 battle flora splice",
+        'base .. "/lib/VoxelBattleScene.lua"' in source,
+        "Kanto patcher does not restore the 2.0 battle tree-support provider",
     )
     require(
-        0 <= preserve < return_before_legacy < legacy_loop,
-        "Dramaless 2.0 does not return before the legacy battle injection",
+        "__ds_btl_props" in source and "live.Flora.battleProps(host, neighbors)" in source,
+        "Kanto battle tree-support call is missing",
+    )
+
+    arena_data = (dramaless / "data" / "battle_arenas.lua").read_text(encoding="utf-8")
+    require(
+        '  ["ROUTE_8"] = { x = 25, y = 7, shape = "wide" },' in arena_data,
+        "accepted Dramaless Route 8 arena anchor changed",
+    )
+    battle_cam = (dramaless / "lib" / "BattleCam.lua").read_text(encoding="utf-8")
+    require(
+        re.search(r"\n\s*wide\s*=\s*\{", battle_cam) is not None,
+        "Dramaless wide battle rig is missing",
     )
     require(
-        "framing preserved." in source,
-        "Dramaless 2.0 battle-preservation contract is not documented",
+        "__ds_r8_wide" in source
+        and 'base .. "/data/battle_arenas.lua"' in source
+        and 'cam = "wide"' in source,
+        "Kanto Route 8 camera-clearance patch is missing",
     )
 
     voxel3d = (dramaless / "lib" / "Voxel3D.lua").read_text(encoding="utf-8")
@@ -149,7 +158,12 @@ def main() -> None:
     for module in ("Mat4", "TileShape", "ModSetting", "DayNight", "ThirdPerson"):
         require((dramaless / "lib" / f"{module}.lua").is_file(), f"missing {module}.lua")
 
-    for engine_file in ("Structures.lua", "ChunkMesher.lua"):
+    for engine_file in (
+        "Structures.lua",
+        "ChunkMesher.lua",
+        "VoxelBattleScene.lua",
+        "battle_arenas.lua",
+    ):
         require(
             "backupInPlace" in source,
             f"rollback backup helper missing before {engine_file} adaptation",

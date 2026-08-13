@@ -6,6 +6,7 @@ local ENGINE_FILES = {
   "lib/Structures.lua",
   "lib/ChunkMesher.lua",
   "lib/VoxelBattleScene.lua",
+  "data/battle_arenas.lua",
 }
 local PATCHED_ENGINE_FILES = {
   "main.lua",
@@ -13,6 +14,8 @@ local PATCHED_ENGINE_FILES = {
   "lib/FirstPerson.lua",
   "lib/Structures.lua",
   "lib/ChunkMesher.lua",
+  "lib/VoxelBattleScene.lua",
+  "data/battle_arenas.lua",
 }
 
 local function hostRead(path)
@@ -29,22 +32,6 @@ end
 
 local function check(condition, message)
   if not condition then fail(message) end
-end
-
-local function injectQ4BattleProps(source)
-  source = source:gsub("\r\n", "\n")
-  local anchor = "    Voxel3D.draw(terrain, atlasFor(host), nil)\n"
-  local first, last = source:find(anchor, 1, true)
-  check(first ~= nil, "q4 migration fixture lost its battle anchor")
-  local block = anchor
-    .. "    -- ds_fp_ceilings __ds_btl_props\n"
-    .. "    pcall(function()\n"
-    .. "      local live = rawget(_G, \"__ds_live\")\n"
-    .. "      if live and live.Flora and live.Flora.battleProps then\n"
-    .. "        live.Flora.battleProps(host, neighbors)\n"
-    .. "      end\n"
-    .. "    end)\n"
-  return source:sub(1, first - 1) .. block .. source:sub(last + 1)
 end
 
 local function count(text, needle)
@@ -170,14 +157,16 @@ function love.load()
     check(mesher:find("__ds_round_mapkey", 1, true), "tree base map key missing")
     check(mesher:find("fastchunks", 1, true), "fast-chunk patch missing")
     local battle = assert(q3.files[BASE .. "/lib/VoxelBattleScene.lua"])
-    check(battle == q3.originals["lib/VoxelBattleScene.lua"],
-          "fresh q5 modified Dramaless 2.0's native battle provider")
-    check(not battle:find("__ds_btl_props", 1, true),
-          "fresh q5 injected the retired 2.0 battle hook")
-    check(q3.files[BASE .. "/lib/VoxelBattleScene.lua.pre-ceiling"] == nil,
-          "fresh q5 backed up an untouched 2.0 battle provider")
+    check(count(battle, "__ds_btl_props") == 1,
+          "q6 battle tree-support hook missing or duplicated")
     check(q3.files[BASE .. "/lib/BattleScene.lua"] == nil,
           "patcher fabricated the removed legacy battle file")
+    local arenas = assert(q3.files[BASE .. "/data/battle_arenas.lua"])
+    check(count(arenas, "__ds_r8_wide") == 1,
+          "Route 8 wide-camera override missing or duplicated")
+    check(arenas:find(
+      '["ROUTE_8"] = { x = 25, y = 7, shape = "wide", cam = "wide" }',
+      1, true), "Route 8 did not select Dramaless's wide rig")
 
     for _, rel in ipairs(PATCHED_ENGINE_FILES) do
       local pre = q3.files[BASE .. "/" .. rel .. ".pre-ceiling"]
@@ -200,8 +189,11 @@ function love.load()
     check(count(scene, "pcall(Backdrop.draw, state)") == 1,
           "second boot duplicated scene layers")
     battle = assert(q3.files[BASE .. "/lib/VoxelBattleScene.lua"])
-    check(battle == q3.originals["lib/VoxelBattleScene.lua"],
-          "second boot modified Dramaless 2.0's native battle provider")
+    check(count(battle, "__ds_btl_props") == 1,
+          "second boot duplicated the battle tree-support hook")
+    arenas = assert(q3.files[BASE .. "/data/battle_arenas.lua"])
+    check(count(arenas, "__ds_r8_wide") == 1,
+          "second boot duplicated the Route 8 camera override")
 
     -- Explicit removal restores every base-owned source byte-for-byte.
     q3.run(true)
@@ -215,31 +207,44 @@ function love.load()
             .. tostring(firstDifference(restored, q3.originals[rel])) .. ")")
     end
 
-    -- Upgrading an existing q4 install strips only q4's exact marked flora
-    -- call. The pristine backup stays available until explicit REMOVE PATCH.
+    -- q5 removed the battle support and did not yet patch battle_arenas.lua.
+    -- Recreate that installed state on top of an otherwise active patch, then
+    -- prove q6 repairs both seams through the maintenance (not fresh-apply)
+    -- path while retaining exact rollback.
     local migrate = fixture("2.0.0-quest.3")
     migrate.run(false)
     local battlePath = BASE .. "/lib/VoxelBattleScene.lua"
     local pristineBattle = migrate.originals["lib/VoxelBattleScene.lua"]
     local nativeBattle = pristineBattle:gsub("\r\n", "\n")
-    migrate.files[battlePath] = injectQ4BattleProps(pristineBattle)
-    migrate.files[battlePath .. ".pre-ceiling"] = pristineBattle
-    migrate.files["ds_fp_ceiling_written.txt"] =
-      (migrate.files["ds_fp_ceiling_written.txt"] or "")
-      .. battlePath .. "\n"
+    local arenasPath = BASE .. "/data/battle_arenas.lua"
+    migrate.files[battlePath] = nativeBattle
+    migrate.files[arenasPath] = migrate.originals["data/battle_arenas.lua"]
+    migrate.files[arenasPath .. ".pre-ceiling"] = nil
     migrate.run(false)
-    check(migrate.files[battlePath] == nativeBattle,
-          "q5 did not strip q4's battle flora block exactly")
+    check(count(migrate.files[battlePath], "__ds_btl_props") == 1,
+          "q5-to-q6 migration did not restore battle tree supports")
     check(migrate.files[battlePath .. ".pre-ceiling"] == pristineBattle,
-          "q5 discarded q4's pristine battle rollback backup")
+          "q5-to-q6 migration discarded the pristine battle backup")
+    check(count(migrate.files[arenasPath], "__ds_r8_wide") == 1,
+          "q5-to-q6 migration did not apply the Route 8 camera override")
+    check(migrate.files[arenasPath .. ".pre-ceiling"]
+          == migrate.originals["data/battle_arenas.lua"],
+          "q5-to-q6 migration did not preserve the arena-data backup")
     migrate.run(false)
-    check(migrate.files[battlePath] == nativeBattle,
-          "q5 battle cleanup is not idempotent")
+    check(count(migrate.files[battlePath], "__ds_btl_props") == 1,
+          "q6 migration battle repair is not idempotent")
+    check(count(migrate.files[arenasPath], "__ds_r8_wide") == 1,
+          "q6 migration camera repair is not idempotent")
     migrate.run(true)
     check(migrate.files[battlePath] == pristineBattle,
-          "q4-to-q5 battle cleanup broke explicit rollback")
+          "q5-to-q6 battle repair broke explicit rollback")
     check(migrate.files[battlePath .. ".pre-ceiling"] == nil,
-          "explicit rollback left the q4 battle backup behind")
+          "explicit rollback left the battle backup behind")
+    check(migrate.files[arenasPath]
+          == migrate.originals["data/battle_arenas.lua"],
+          "q5-to-q6 camera repair broke exact rollback")
+    check(migrate.files[arenasPath .. ".pre-ceiling"] == nil,
+          "explicit rollback left the arena-data backup behind")
 
     -- Unknown versions may log outside the base but must not touch base files.
     local future = fixture("2.0.1-quest.0")

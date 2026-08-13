@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.60.0-quest.6
+
+- **ROUTE 8 BATTLE CAMERA CLEARANCE.** Physical q5 logs proved that its
+  retired flora hook was removed correctly while the same obstruction stayed,
+  falsifying q5's first diagnosis. The blocker is a lifted terrain canopy at
+  Dramaless 2.0's long-lens eye position. q6 selects Dramaless's existing
+  per-arena wide rig for Route 8 only, leaving global battle, VR, Pokédex and
+  exploration cameras untouched.
+- **BATTLE TREE SUPPORTS RESTORED.** Because q5 proved the optional flora draw
+  was not the obstruction, q6 restores it so lifted rounds retain their trunks,
+  stones, hoods and shadows during battles.
+
 ## 1.60.0-quest.5
 
 - **DRAMALESS 2.0 BATTLE-FRAMING FIX.** Route 8 physical testing showed that
