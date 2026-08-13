@@ -1,5 +1,5 @@
 param(
-  [string]$Output = "dist/KANTO_FIRST_PERSON-1.60.0-quest.2.zip"
+  [string]$Output = "dist/KANTO_FIRST_PERSON-1.60.0-quest.3.zip"
 )
 
 $ErrorActionPreference = "Stop"
@@ -11,15 +11,17 @@ if (Test-Path -LiteralPath $stage) {
   Remove-Item -LiteralPath $stage -Recurse -Force
 }
 New-Item -ItemType Directory -Path $stage | Out-Null
+$payload = Join-Path $stage "ds_fp_ceiling"
+New-Item -ItemType Directory -Path $payload | Out-Null
 
 $runtime = Get-ChildItem -LiteralPath $root -File | Where-Object {
   $_.Name -notmatch '^\.' -and $_.Extension -notin @('.zip', '.modpkg', '.apk')
 }
 foreach ($file in $runtime) {
-  Copy-Item -LiteralPath $file.FullName -Destination $stage -Force
+  Copy-Item -LiteralPath $file.FullName -Destination $payload -Force
 }
 
-$forbidden = Get-ChildItem -LiteralPath $stage -Recurse -File | Where-Object {
+$forbidden = Get-ChildItem -LiteralPath $payload -Recurse -File | Where-Object {
   $_.Extension -match '^\.(gb|gbc|gba|sav|srm|apk)$' -or
   $_.FullName -match '[\\/](baseroms|generated|cache)[\\/]'
 }
@@ -27,10 +29,10 @@ if ($forbidden) {
   throw "Forbidden user/game data entered package: $($forbidden.FullName -join ', ')"
 }
 
-$manifest = Get-Content -LiteralPath (Join-Path $stage 'manifest.json') -Raw |
+$manifest = Get-Content -LiteralPath (Join-Path $payload 'manifest.json') -Raw |
   ConvertFrom-Json
 if ($manifest.id -ne 'ds_fp_ceiling' -or
-    $manifest.version -ne '1.60.0-quest.2') {
+    $manifest.version -ne '1.60.0-quest.3') {
   throw 'Unexpected manifest identity/version'
 }
 
@@ -38,7 +40,24 @@ New-Item -ItemType Directory -Path (Split-Path $outputPath) -Force | Out-Null
 if (Test-Path -LiteralPath $outputPath) {
   Remove-Item -LiteralPath $outputPath -Force
 }
-Compress-Archive -Path (Join-Path $stage '*') -DestinationPath $outputPath
+$sevenZip = (Get-Command 7z.exe -ErrorAction Stop).Source
+$fixedTime = [DateTime]::SpecifyKind([DateTime]'2000-01-01T00:00:00', 'Utc')
+foreach ($entry in @(Get-Item -LiteralPath $payload) +
+    @(Get-ChildItem -LiteralPath $payload -Recurse -Force)) {
+  $entry.CreationTimeUtc = $fixedTime
+  $entry.LastAccessTimeUtc = $fixedTime
+  $entry.LastWriteTimeUtc = $fixedTime
+}
+Push-Location $stage
+try {
+  # Let 7-Zip add the payload entries without emitting a root-directory entry.
+  # Older 7-Zip stores a changing NTFS access time on that one entry, making
+  # otherwise identical Quest packages non-deterministic.
+  & $sevenZip a -tzip -mx=9 -bd -bso0 -bsp0 $outputPath 'ds_fp_ceiling\*'
+  if ($LASTEXITCODE -ne 0) { throw "7-Zip failed with exit code $LASTEXITCODE" }
+} finally {
+  Pop-Location
+}
 Remove-Item -LiteralPath $stage -Recurse -Force
 
 $hash = Get-FileHash -LiteralPath $outputPath -Algorithm SHA256

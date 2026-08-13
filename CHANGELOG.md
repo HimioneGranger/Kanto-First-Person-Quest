@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.60.0-quest.3
+
+- **QUEST IMPORTER PACKAGE FIX.** The q2 source passed all Lua, live-patch,
+  rollback and package-content gates, but the physical Quest importer rejected
+  its PowerShell-written flat-root ZIP before reading the manifest. q3 retains
+  the same audited source changes and packages with 7-Zip under one
+  `ds_fp_ceiling/` root directory, matching the known-working official 1.60.0
+  archive shape. A focused LÖVE/PhysicsFS test mounts the final archive and
+  reads the Kanto manifest before it is staged on the headset.
+
 ## 1.60.0-quest.2
 
 - **DRAMALESS 2.0 QUEST SUPPORT.** Audited the accepted

@@ -34,10 +34,26 @@ foreach ($test in @("love_syntax", "love_patch_contract")) {
 }
 
 & (Join-Path $PSScriptRoot "package_quest.ps1")
-$archive = Join-Path $root "dist\KANTO_FIRST_PERSON-1.60.0-quest.2.zip"
+$archive = Join-Path $root "dist\KANTO_FIRST_PERSON-1.60.0-quest.3.zip"
 $first = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash
 & (Join-Path $PSScriptRoot "package_quest.ps1")
 $second = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash
 if ($first -ne $second) { throw "Quest archive builds are not deterministic" }
 
 Write-Host "PASS: deterministic Quest package $first"
+
+$env:KANTO_TEST_ARCHIVE = $archive
+$mountApp = Join-Path $PSScriptRoot "love_archive_mount"
+$mountResult = Join-Path $mountApp "result.txt"
+if (Test-Path -LiteralPath $mountResult) {
+  Remove-Item -LiteralPath $mountResult -Force
+}
+$mountProc = Start-Process -FilePath $lovePath -ArgumentList $mountApp -Wait `
+  -WindowStyle Hidden -PassThru
+$mountDetail = if (Test-Path -LiteralPath $mountResult) {
+  Get-Content -LiteralPath $mountResult -Raw
+} else { "no test report" }
+if ($mountProc.ExitCode -ne 0 -or $mountDetail -notmatch '^PASS:') {
+  throw "Quest archive mount failed: $mountDetail"
+}
+Write-Host $mountDetail.Trim()

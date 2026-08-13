@@ -1,7 +1,9 @@
 # Dramaless 2.0 Quest compatibility
 
 This Quest fork adapts Kanto in First Person 1.60.0 to the accepted Dramaless
-2.0 Quest q3 core baseline at commit `1b3ac8c`.
+2.0 Quest q3 core baseline at commit `1b3ac8c`. Kanto package q3 retains the
+q2 source adaptation and changes only the importer-facing archive format after
+the physical Quest rejected q2's PowerShell-written flat-root ZIP.
 
 ## Audited seams
 
