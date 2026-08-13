@@ -123,9 +123,21 @@ def main() -> None:
         "    Voxel3D.draw(terrain, atlasFor(host), nil)\n",
         "2.0 native-card battle terrain",
     )
+    preserve = source.find('if verBase == "2.0.0" then')
+    return_before_legacy = source.find("\n      return\n    end", preserve)
+    legacy_loop = source.find("for _, candidate in ipairs", preserve)
+    require(preserve >= 0, "Kanto patcher has no Dramaless 2.0 battle guard")
     require(
-        'base .. "/lib/VoxelBattleScene.lua"' in source,
-        "Kanto patcher does not target the 2.0 battle provider",
+        'local clean, removed = stripBattleProps(src)' in source,
+        "Kanto patcher cannot remove the q4 battle flora splice",
+    )
+    require(
+        0 <= preserve < return_before_legacy < legacy_loop,
+        "Dramaless 2.0 does not return before the legacy battle injection",
+    )
+    require(
+        "framing preserved." in source,
+        "Dramaless 2.0 battle-preservation contract is not documented",
     )
 
     voxel3d = (dramaless / "lib" / "Voxel3D.lua").read_text(encoding="utf-8")
@@ -137,7 +149,7 @@ def main() -> None:
     for module in ("Mat4", "TileShape", "ModSetting", "DayNight", "ThirdPerson"):
         require((dramaless / "lib" / f"{module}.lua").is_file(), f"missing {module}.lua")
 
-    for engine_file in ("Structures.lua", "ChunkMesher.lua", "VoxelBattleScene.lua"):
+    for engine_file in ("Structures.lua", "ChunkMesher.lua"):
         require(
             "backupInPlace" in source,
             f"rollback backup helper missing before {engine_file} adaptation",

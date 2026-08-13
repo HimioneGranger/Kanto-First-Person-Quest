@@ -920,7 +920,7 @@ local Flora = __dsMod("Flora", "__ds_flora_status")]]
     local sky = mod:read("payload_sky.lua")
     spliceTallTrees(base)
     spliceSunCast(base)
-    spliceBattleProps(base)
+    spliceBattleProps(base, ver)
     if sky then writeTracked(base .. "/lib/SkyLayer.lua", sky) end
     local flora = mod:read("payload_flora.lua")
     if flora then writeTracked(base .. "/lib/Flora.lua", flora) end
@@ -1139,9 +1139,48 @@ local Flora = __dsMod("Flora", "__ds_flora_status")]]
     say("sun pass spliced: raised stems cast shadows.")
   end
 
-  -- THE BATTLE SPLICE: the same stems stand during 3D battles, drawn
-  -- right after the battle's own terrain -- both terrain sites.
-  spliceBattleProps = function(base)
+  -- The historical battle splice makes raised stems stand during older 3D
+  -- battles. Dramaless 2.0 owns a dedicated VoxelBattleScene and its native
+  -- framing proved correct on Quest before this companion injected the same
+  -- host-and-neighbour props a second time. In particular, that extra layer
+  -- can crowd the Route 8 camera. Preserve 2.0's provider exactly and remove
+  -- the q4 marker block from already-patched installs; older bases retain the
+  -- established BattleScene splice.
+  local function stripBattleProps(src)
+    if not src then return src, false end
+    for _, indent in ipairs({ "    ", "      " }) do
+      local block = indent .. "-- ds_fp_ceilings __ds_btl_props\n"
+        .. indent .. "pcall(function()\n"
+        .. indent .. "  local live = rawget(_G, \"__ds_live\")\n"
+        .. indent .. "  if live and live.Flora and live.Flora.battleProps then\n"
+        .. indent .. "    live.Flora.battleProps(host, neighbors)\n"
+        .. indent .. "  end\n"
+        .. indent .. "end)\n"
+      local first, last = src:find(block, 1, true)
+      if first then
+        return src:sub(1, first - 1) .. src:sub(last + 1), true
+      end
+    end
+    return src, false
+  end
+
+  spliceBattleProps = function(base, ver)
+    local verBase = ver and ver:match("^(%d+%.%d+%.%d+)")
+    if verBase == "2.0.0" then
+      local p = base .. "/lib/VoxelBattleScene.lua"
+      local src = readSrc(p)
+      local clean, removed = stripBattleProps(src)
+      if removed then
+        if writeTracked(p, clean) then
+          say("Dramaless 2.0 battle flora splice removed; native battle "
+              .. "framing preserved.")
+        else
+          say("could not remove the Dramaless 2.0 battle flora splice.")
+        end
+      end
+      return
+    end
+
     local p, src, a
     for _, candidate in ipairs({
       { base .. "/lib/VoxelBattleScene.lua",
@@ -1474,7 +1513,7 @@ local Flora = __dsMod("Flora", "__ds_flora_status")]]
       end
       spliceTallTrees(base)
       spliceSunCast(base)
-      spliceBattleProps(base)
+      spliceBattleProps(base, ver)
     elseif wantOn then
       apply(base, ver, vs)
     else

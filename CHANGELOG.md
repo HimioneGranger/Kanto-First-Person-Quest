@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.60.0-quest.5
+
+- **DRAMALESS 2.0 BATTLE-FRAMING FIX.** Route 8 physical testing showed that
+  q4's inherited raised-flora battle splice crowded Dramaless 2.0's dedicated
+  `VoxelBattleScene` camera. Dramaless 2.0 now keeps its native battle provider
+  untouched. On an existing q4 installation, q5 removes only the exact
+  `__ds_btl_props` marker block while retaining the pristine rollback backup.
+  Legacy Dramatic Shape battle providers keep the older raised-stem behavior.
+
 ## 1.60.0-quest.4
 
 - **ANDROID PHYSICSFS ZIP-ORIGIN FIX.** The physical Quest importer also
