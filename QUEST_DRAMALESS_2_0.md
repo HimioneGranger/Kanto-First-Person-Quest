@@ -8,7 +8,8 @@ Windows/FAT-origin headers, q4 reproduces the Unix-origin header style of the
 known-working official archive. q5 tested removal of one optional battle-only
 flora injection, but physical logs proved the removal succeeded while the same
 Route 8 obstruction remained. q6 supersedes that rejected diagnosis with a
-per-arena camera-clearance fix.
+per-arena camera-clearance fix. q7 adds the corresponding Route 12 water-stage
+correction after physical evidence showed that map's authored arena was wrong.
 
 ## Audited seams
 
@@ -32,7 +33,13 @@ per-arena camera-clearance fix.
 - `data/battle_arenas.lua`: Kanto's lifted Route 8 terrain intersects the
   default telephoto rig, whose eye stands roughly five blocks from the arena.
   q6 changes only Route 8 to Dramaless's existing authored `cam = "wide"` rig.
-  Global battle-camera constants, VR matrices and every other arena stay native.
+  Device logs then identified the separate battle south of Lavender as
+  `ROUTE_12`. Dramaless authors all of Route 12 onto a land clearing at
+  `(0,73)`; a temporary diagnostic made from the user's authorized Yellow ROM
+  confirmed `(10,4)` is a complete 3x6 water arena by the Lavender entrance.
+  q7 moves only Route 12 there and gives it the same clear wide rig. No
+  ROM-derived map output remains in this repository or package. Global battle-
+  camera constants, VR matrices and every other arena stay native.
 
 ## Safety and rollback
 
@@ -42,8 +49,9 @@ is accepted only because the q3 anchor contract is checked by
 ChunkMesher, VoxelScene, FirstPerson, main, the battle provider and battle arena
 data receive pristine in-place backups before their first write. q6 retains an
 existing q4/q5 battle backup and creates the arena-data backup only when its
-Route 8 override applies. The normal explicit REMOVE PATCH path restores every
-base-owned file byte-for-byte.
+Route 8 override applies. q7 reuses that same pristine arena backup while
+adding Route 12, including during an installed q6-to-q7 update. The normal
+explicit REMOVE PATCH path restores every base-owned file byte-for-byte.
 
 No ROM, save, generated cache, APK, or commercial game data belongs in this
 repository or package. The user's normal Gen1Recomp ROM-import workflow is

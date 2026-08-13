@@ -658,7 +658,7 @@ mod.options:define({
   -- already patched took the "module updated" branch instead, so the
   -- splice never landed and the feature did nothing. Idempotent: each
   -- file is checked for its own marker before anything is written.
-  local spliceSunCast, spliceBattleProps, spliceRoute8BattleCam
+  local spliceSunCast, spliceBattleProps, spliceBattleArenaFixes
                                            -- defined below manageOne's
                                            -- helpers; forward-declared
                                            -- so apply() closes over the
@@ -922,7 +922,7 @@ local Flora = __dsMod("Flora", "__ds_flora_status")]]
     spliceTallTrees(base)
     spliceSunCast(base)
     spliceBattleProps(base, ver)
-    spliceRoute8BattleCam(base, ver)
+    spliceBattleArenaFixes(base, ver)
     if sky then writeTracked(base .. "/lib/SkyLayer.lua", sky) end
     local flora = mod:read("payload_flora.lua")
     if flora then writeTracked(base .. "/lib/Flora.lua", flora) end
@@ -1007,6 +1007,9 @@ local Flora = __dsMod("Flora", "__ds_flora_status")]]
     t = t:gsub('  %["ROUTE_8"%] = { x = 25, y = 7, shape = "wide",'
                .. ' cam = "wide" }, %-%- ds_fp_ceilings __ds_r8_wide',
                '  ["ROUTE_8"] = { x = 25, y = 7, shape = "wide" },', 1)
+    t = t:gsub('  %["ROUTE_12"%] = { x = 10, y = 4, shape = "wide",'
+               .. ' cam = "wide" }, %-%- ds_fp_ceilings __ds_r12_wide',
+               '  ["ROUTE_12"] = { x = 0, y = 73, shape = "wide" },', 1)
     return t
   end
   local function unpatch(base)
@@ -1181,30 +1184,48 @@ local Flora = __dsMod("Flora", "__ds_flora_status")]]
   end
 
   -- Dramaless' default telephoto battle rig stands roughly five blocks from
-  -- the arena. Once Kanto lifts Route 8's round terrain, that eye position is
-  -- underneath a canopy: the same giant brown/gray obstruction reproduced in
-  -- both q4 and q5. Dramaless already provides the `cam = "wide"` authoring
-  -- escape hatch for a stage whose long-lens eye intersects world geometry.
-  -- Apply it to Route 8 only; no global camera constants or VR matrices move.
-  spliceRoute8BattleCam = function(base, ver)
+  -- the arena. Where Kanto's lifted terrain covers that eye position, use the
+  -- base mod's existing per-arena `cam = "wide"` escape hatch. Route 12 also
+  -- needs its authored stage moved: upstream pins the whole map to a land
+  -- clearing at (0,73), but the route immediately south of Lavender is a
+  -- boardwalk over water. ROM-derived map data was inspected only in a
+  -- temporary diagnostic worktree and proves (10,4) is a complete 3x6 water
+  -- arena; no extracted data is shipped. No global camera constants or VR
+  -- matrices move, and an unlisted arena keeps its authored native rig.
+  spliceBattleArenaFixes = function(base, ver)
     local verBase = ver and ver:match("^(%d+%.%d+%.%d+)")
     if verBase ~= "2.0.0" then return end
     local p = base .. "/data/battle_arenas.lua"
     local src = readSrc(p)
-    if not src or src:find("__ds_r8_wide", 1, true) then return end
-    local old = '  ["ROUTE_8"] = { x = 25, y = 7, shape = "wide" },'
-    local new = '  ["ROUTE_8"] = { x = 25, y = 7, shape = "wide",'
-      .. ' cam = "wide" }, -- ds_fp_ceilings __ds_r8_wide'
-    local patched = splice(src, old, new)
-    if not patched then
-      say("Route 8 battle-camera anchor not found; leaving its native rig.")
-      return
+    if not src then return end
+    local original = src
+    local changed = false
+    for _, arena in ipairs({
+      { id = "Route 8", marker = "__ds_r8_wide",
+        old = '  ["ROUTE_8"] = { x = 25, y = 7, shape = "wide" },',
+        new = '  ["ROUTE_8"] = { x = 25, y = 7, shape = "wide",'
+          .. ' cam = "wide" }, -- ds_fp_ceilings __ds_r8_wide',
+        success = "Route 8 battle camera widened to clear Kanto's lifted terrain." },
+      { id = "Route 12", marker = "__ds_r12_wide",
+        old = '  ["ROUTE_12"] = { x = 0, y = 73, shape = "wide" },',
+        new = '  ["ROUTE_12"] = { x = 10, y = 4, shape = "wide",'
+          .. ' cam = "wide" }, -- ds_fp_ceilings __ds_r12_wide',
+        success = "Route 12 battle moved onto water with a clear wide camera." },
+    }) do
+      if not src:find(arena.marker, 1, true) then
+        local patched = splice(src, arena.old, arena.new)
+        if patched then
+          src, changed = patched, true
+          say(arena.success)
+        else
+          say(arena.id .. " battle-arena anchor not found; leaving its native stage.")
+        end
+      end
     end
-    backupInPlace(p, src)
-    if writeTracked(p, patched) then
-      say("Route 8 battle camera widened to clear Kanto's lifted terrain.")
-    else
-      say("could not apply the Route 8 battle-camera clearance fix.")
+    if not changed then return end
+    backupInPlace(p, original)
+    if not writeTracked(p, src) then
+      say("could not apply the battle-arena compatibility fixes.")
     end
   end
 
@@ -1507,7 +1528,7 @@ local Flora = __dsMod("Flora", "__ds_flora_status")]]
       spliceTallTrees(base)
       spliceSunCast(base)
       spliceBattleProps(base, ver)
-      spliceRoute8BattleCam(base, ver)
+      spliceBattleArenaFixes(base, ver)
     elseif wantOn then
       apply(base, ver, vs)
     else

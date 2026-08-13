@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.60.0-quest.7
+
+- **ROUTE 12 WATER BATTLE STAGE.** A battle immediately south of Lavender was
+  staged in the wrong land clearing and obstructed. Device logs identify it as
+  `ROUTE_12`; source inspection shows Dramaless pins the whole route to land at
+  `(0,73)`. A temporary, unshipped Yellow map diagnostic found a complete 3x6
+  water arena at `(10,4)`. q7 moves Route 12 there and selects Dramaless's
+  existing wide camera so its eye stays clear. Route 8 remains unchanged and
+  physically accepted; every unlisted map retains its authored stage/camera.
+
 ## 1.60.0-quest.6
 
 - **ROUTE 8 BATTLE CAMERA CLEARANCE.** Physical q5 logs proved that its

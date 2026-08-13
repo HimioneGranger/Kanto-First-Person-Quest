@@ -167,6 +167,11 @@ function love.load()
     check(arenas:find(
       '["ROUTE_8"] = { x = 25, y = 7, shape = "wide", cam = "wide" }',
       1, true), "Route 8 did not select Dramaless's wide rig")
+    check(count(arenas, "__ds_r12_wide") == 1,
+          "Route 12 water-arena override missing or duplicated")
+    check(arenas:find(
+      '["ROUTE_12"] = { x = 10, y = 4, shape = "wide", cam = "wide" }',
+      1, true), "Route 12 did not move to the clear water arena")
 
     for _, rel in ipairs(PATCHED_ENGINE_FILES) do
       local pre = q3.files[BASE .. "/" .. rel .. ".pre-ceiling"]
@@ -194,6 +199,8 @@ function love.load()
     arenas = assert(q3.files[BASE .. "/data/battle_arenas.lua"])
     check(count(arenas, "__ds_r8_wide") == 1,
           "second boot duplicated the Route 8 camera override")
+    check(count(arenas, "__ds_r12_wide") == 1,
+          "second boot duplicated the Route 12 water-arena override")
 
     -- Explicit removal restores every base-owned source byte-for-byte.
     q3.run(true)
@@ -207,42 +214,48 @@ function love.load()
             .. tostring(firstDifference(restored, q3.originals[rel])) .. ")")
     end
 
-    -- q5 removed the battle support and did not yet patch battle_arenas.lua.
-    -- Recreate that installed state on top of an otherwise active patch, then
-    -- prove q6 repairs both seams through the maintenance (not fresh-apply)
-    -- path while retaining exact rollback.
+    -- Recreate an installed q6 state: its battle support and Route 8 camera
+    -- are active, but Route 12 still has Dramaless's native land stage. Prove
+    -- q7 adds only the Route 12 water-stage seam through the maintenance (not
+    -- fresh-apply) path while retaining the original pristine backup.
     local migrate = fixture("2.0.0-quest.3")
     migrate.run(false)
     local battlePath = BASE .. "/lib/VoxelBattleScene.lua"
     local pristineBattle = migrate.originals["lib/VoxelBattleScene.lua"]
-    local nativeBattle = pristineBattle:gsub("\r\n", "\n")
     local arenasPath = BASE .. "/data/battle_arenas.lua"
-    migrate.files[battlePath] = nativeBattle
-    migrate.files[arenasPath] = migrate.originals["data/battle_arenas.lua"]
-    migrate.files[arenasPath .. ".pre-ceiling"] = nil
+    local q6Arenas, reverted = migrate.files[arenasPath]:gsub(
+      '  %["ROUTE_12"%] = { x = 10, y = 4, shape = "wide",'
+        .. ' cam = "wide" }, %-%- ds_fp_ceilings __ds_r12_wide',
+      '  ["ROUTE_12"] = { x = 0, y = 73, shape = "wide" },', 1)
+    check(reverted == 1, "could not construct the installed q6 fixture")
+    migrate.files[arenasPath] = q6Arenas
     migrate.run(false)
     check(count(migrate.files[battlePath], "__ds_btl_props") == 1,
-          "q5-to-q6 migration did not restore battle tree supports")
+          "q6-to-q7 migration disturbed battle tree supports")
     check(migrate.files[battlePath .. ".pre-ceiling"] == pristineBattle,
-          "q5-to-q6 migration discarded the pristine battle backup")
+          "q6-to-q7 migration discarded the pristine battle backup")
     check(count(migrate.files[arenasPath], "__ds_r8_wide") == 1,
-          "q5-to-q6 migration did not apply the Route 8 camera override")
+          "q6-to-q7 migration disturbed the Route 8 camera override")
+    check(count(migrate.files[arenasPath], "__ds_r12_wide") == 1,
+          "q6-to-q7 migration did not apply the Route 12 water arena")
     check(migrate.files[arenasPath .. ".pre-ceiling"]
           == migrate.originals["data/battle_arenas.lua"],
-          "q5-to-q6 migration did not preserve the arena-data backup")
+          "q6-to-q7 migration did not preserve the arena-data backup")
     migrate.run(false)
     check(count(migrate.files[battlePath], "__ds_btl_props") == 1,
-          "q6 migration battle repair is not idempotent")
+          "q7 migration disturbed the battle hook on a second boot")
     check(count(migrate.files[arenasPath], "__ds_r8_wide") == 1,
-          "q6 migration camera repair is not idempotent")
+          "q7 migration duplicated the Route 8 camera override")
+    check(count(migrate.files[arenasPath], "__ds_r12_wide") == 1,
+          "q7 migration duplicated the Route 12 water arena")
     migrate.run(true)
     check(migrate.files[battlePath] == pristineBattle,
-          "q5-to-q6 battle repair broke explicit rollback")
+          "q6-to-q7 migration broke battle rollback")
     check(migrate.files[battlePath .. ".pre-ceiling"] == nil,
           "explicit rollback left the battle backup behind")
     check(migrate.files[arenasPath]
           == migrate.originals["data/battle_arenas.lua"],
-          "q5-to-q6 camera repair broke exact rollback")
+          "q6-to-q7 arena migration broke exact rollback")
     check(migrate.files[arenasPath .. ".pre-ceiling"] == nil,
           "explicit rollback left the arena-data backup behind")
 

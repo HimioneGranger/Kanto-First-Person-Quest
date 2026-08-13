@@ -137,6 +137,10 @@ def main() -> None:
         '  ["ROUTE_8"] = { x = 25, y = 7, shape = "wide" },' in arena_data,
         "accepted Dramaless Route 8 arena anchor changed",
     )
+    require(
+        '  ["ROUTE_12"] = { x = 0, y = 73, shape = "wide" },' in arena_data,
+        "accepted Dramaless Route 12 arena anchor changed",
+    )
     battle_cam = (dramaless / "lib" / "BattleCam.lua").read_text(encoding="utf-8")
     require(
         re.search(r"\n\s*wide\s*=\s*\{", battle_cam) is not None,
@@ -147,6 +151,11 @@ def main() -> None:
         and 'base .. "/data/battle_arenas.lua"' in source
         and 'cam = "wide"' in source,
         "Kanto Route 8 camera-clearance patch is missing",
+    )
+    require(
+        "__ds_r12_wide" in source
+        and '["ROUTE_12"] = { x = 10, y = 4, shape = "wide",' in source,
+        "Kanto Route 12 water-arena patch is missing",
     )
 
     voxel3d = (dramaless / "lib" / "Voxel3D.lua").read_text(encoding="utf-8")
@@ -173,7 +182,7 @@ def main() -> None:
         "unknown-version safe-refusal contract is missing",
     )
 
-    print("PASS: Dramaless 2.0 q3 anchors, ordering, payload API and rollback contract")
+    print("PASS: Dramaless 2.0 q3 anchors, Kanto arena fixes, payload API and rollback contract")
 
 
 if __name__ == "__main__":
