@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.60.0-quest.8
+
+- **ROUTE 7 BATTLE CAMERA CLEARANCE.** Live Quest evidence identified the
+  obstructed Pidgey battle as `ROUTE_7`. The authored narrow arena at `(8,8)`
+  remains valid, so q8 preserves its position and shape and selects only
+  Dramaless's existing per-arena `cam = "wide"` rig. Route 8 and Route 12
+  remain unchanged; no global camera, OpenXR, Pokédex or exploration setting
+  moves.
+
 ## 1.60.0-quest.7
 
 - **ROUTE 12 WATER BATTLE STAGE.** A battle immediately south of Lavender was

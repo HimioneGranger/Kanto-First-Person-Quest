@@ -1004,6 +1004,9 @@ local Flora = __dsMod("Flora", "__ds_flora_status")]]
                .. "  pcall%(function%(%)\n.-\n  end%)\n", "", 1)
     t = t:gsub("      %-%- ds_fp_ceilings __ds_btl_props\n"
                .. "      pcall%(function%(%)\n.-\n      end%)\n", "")
+    t = t:gsub('  %["ROUTE_7"%] = { x = 8, y = 8, shape = "narrow",'
+               .. ' cam = "wide" }, %-%- ds_fp_ceilings __ds_r7_wide',
+               '  ["ROUTE_7"] = { x = 8, y = 8, shape = "narrow" },', 1)
     t = t:gsub('  %["ROUTE_8"%] = { x = 25, y = 7, shape = "wide",'
                .. ' cam = "wide" }, %-%- ds_fp_ceilings __ds_r8_wide',
                '  ["ROUTE_8"] = { x = 25, y = 7, shape = "wide" },', 1)
@@ -1201,6 +1204,11 @@ local Flora = __dsMod("Flora", "__ds_flora_status")]]
     local original = src
     local changed = false
     for _, arena in ipairs({
+      { id = "Route 7", marker = "__ds_r7_wide",
+        old = '  ["ROUTE_7"] = { x = 8, y = 8, shape = "narrow" },',
+        new = '  ["ROUTE_7"] = { x = 8, y = 8, shape = "narrow",'
+          .. ' cam = "wide" }, -- ds_fp_ceilings __ds_r7_wide',
+        success = "Route 7 battle camera widened to clear Kanto's lifted terrain." },
       { id = "Route 8", marker = "__ds_r8_wide",
         old = '  ["ROUTE_8"] = { x = 25, y = 7, shape = "wide" },',
         new = '  ["ROUTE_8"] = { x = 25, y = 7, shape = "wide",'

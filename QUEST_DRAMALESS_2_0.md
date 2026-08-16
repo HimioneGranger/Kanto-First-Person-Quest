@@ -10,6 +10,8 @@ flora injection, but physical logs proved the removal succeeded while the same
 Route 8 obstruction remained. q6 supersedes that rejected diagnosis with a
 per-arena camera-clearance fix. q7 adds the corresponding Route 12 water-stage
 correction after physical evidence showed that map's authored arena was wrong.
+q8 adds the same per-arena wide lens to Route 7 after a live Pidgey battle
+showed its long-lens eye was obstructed; its valid narrow stage is preserved.
 
 ## Audited seams
 
@@ -37,7 +39,9 @@ correction after physical evidence showed that map's authored arena was wrong.
   `ROUTE_12`. Dramaless authors all of Route 12 onto a land clearing at
   `(0,73)`; a temporary diagnostic made from the user's authorized Yellow ROM
   confirmed `(10,4)` is a complete 3x6 water arena by the Lavender entrance.
-  q7 moves only Route 12 there and gives it the same clear wide rig. No
+  q7 moves only Route 12 there and gives it the same clear wide rig. Live q8
+  evidence identifies the obstructed Pidgey battle as `ROUTE_7`; q8 preserves
+  its authored `(8,8)` narrow arena and changes only its lens to `cam = "wide"`. No
   ROM-derived map output remains in this repository or package. Global battle-
   camera constants, VR matrices and every other arena stay native.
 
@@ -50,7 +54,8 @@ ChunkMesher, VoxelScene, FirstPerson, main, the battle provider and battle arena
 data receive pristine in-place backups before their first write. q6 retains an
 existing q4/q5 battle backup and creates the arena-data backup only when its
 Route 8 override applies. q7 reuses that same pristine arena backup while
-adding Route 12, including during an installed q6-to-q7 update. The normal
+adding Route 12. q8 reuses it again while adding Route 7, including during an
+installed q7-to-q8 update. The normal
 explicit REMOVE PATCH path restores every base-owned file byte-for-byte.
 
 No ROM, save, generated cache, APK, or commercial game data belongs in this

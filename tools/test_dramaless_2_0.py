@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Focused, ROM-free compatibility contract for Dramaless 2.0 Quest q3."""
+"""Focused, ROM-free compatibility contract for Dramaless 2.0 Quest q7."""
 
 from __future__ import annotations
 
@@ -40,8 +40,8 @@ def main() -> None:
     manifest = json.loads((dramaless / "manifest.json").read_text(encoding="utf-8"))
     require(
         manifest.get("id") == "DRAMALESS_SHAPE"
-        and manifest.get("version") == "2.0.0-quest.3",
-        "test must target the accepted Dramaless 2.0 Quest q3 source",
+        and manifest.get("version") == "2.0.0-quest.7",
+        "test must target the accepted Dramaless 2.0 Quest q7 source",
     )
     require('["2.0.0"] = true' in source, "2.0.0 is not in Kanto's audited table")
 
@@ -134,6 +134,10 @@ def main() -> None:
 
     arena_data = (dramaless / "data" / "battle_arenas.lua").read_text(encoding="utf-8")
     require(
+        '  ["ROUTE_7"] = { x = 8, y = 8, shape = "narrow" },' in arena_data,
+        "accepted Dramaless Route 7 arena anchor changed",
+    )
+    require(
         '  ["ROUTE_8"] = { x = 25, y = 7, shape = "wide" },' in arena_data,
         "accepted Dramaless Route 8 arena anchor changed",
     )
@@ -145,6 +149,11 @@ def main() -> None:
     require(
         re.search(r"\n\s*wide\s*=\s*\{", battle_cam) is not None,
         "Dramaless wide battle rig is missing",
+    )
+    require(
+        "__ds_r7_wide" in source
+        and '["ROUTE_7"] = { x = 8, y = 8, shape = "narrow",' in source,
+        "Kanto Route 7 camera-clearance patch is missing",
     )
     require(
         "__ds_r8_wide" in source
@@ -182,7 +191,7 @@ def main() -> None:
         "unknown-version safe-refusal contract is missing",
     )
 
-    print("PASS: Dramaless 2.0 q3 anchors, Kanto arena fixes, payload API and rollback contract")
+    print("PASS: Dramaless 2.0 q7 anchors, Kanto arena fixes, payload API and rollback contract")
 
 
 if __name__ == "__main__":
