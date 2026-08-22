@@ -139,7 +139,11 @@ It established the silhouette but was too painterly. The revised
 GBC/GBA-and-voxel direction is
 `artwork/concepts/viridian-forest-horizon-v2.png` (2172x724 RGBA, SHA-256
 `1324C52590DDCCDFB7C4922C4C6CB6E90D7A4F8E756CA85E1B66B8367534B93C`).
-Both are art-direction sources, not yet shipped runtime textures.
+Some broadleaf tiers in v2 shared long vertical boundaries and read as stacked
+columns. The naturalized revision staggers and interlocks those canopy edges:
+`artwork/concepts/viridian-forest-horizon-v3.png` (2172x724 RGBA, SHA-256
+`F2791F6A3DFB6DC118A6D447C7D9EB89B30E6DA90E33A9B0DF06EA9ED87BE9C0`).
+All three are art-direction sources, not yet shipped runtime textures.
 
 ## Acceptance tests
 
