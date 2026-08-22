@@ -257,6 +257,10 @@ mod.options:define({
       default = "VALLEY",
       choices = { { "KANTO", "KANTO" }, { "FUJI", "FUJI" },
                   { "VALLEY", "VALLEY" }, { "CITY", "CITY" } } },
+    -- First location-aware art slice. Off by default until the compass,
+    -- transition and performance contract passes on a physical Quest 3.
+    { key = "worldhorizon", label = "WORLD HORIZON BETA", type = "toggle",
+      default = false },
     { key = "grass", label = "GRASS HEIGHT", type = "choice",
       default = "SUBTLE",
       choices = { { "OFF", "OFF" }, { "SUBTLE", "SUBTLE" },
@@ -359,6 +363,7 @@ mod.options:define({
       third = opt("third", "CUTAWAY"),
       backdrop = opt("backdrop", true) ~= false,
       horizonart = opt("horizonart", "KANTO"),
+      worldhorizon = opt("worldhorizon", false) == true,
       jump = opt("jump", "SUBTLE"),
       grass = opt("grass", "SUBTLE"),
       particles = opt("particles", true) ~= false,
@@ -880,6 +885,7 @@ local Flora = __dsMod("Flora", "__ds_flora_status")]]
       return
     end
     local backdrop = mod:read("payload_backdrop.lua")
+    local worldHorizon = mod:read("payload_world_horizon.lua")
     local artwork = mod:read("backdrop.png")
     local vsPath = base .. "/lib/VoxelScene.lua"
     local mainPath = base .. "/main.lua"
@@ -926,9 +932,13 @@ local Flora = __dsMod("Flora", "__ds_flora_status")]]
     if sky then writeTracked(base .. "/lib/SkyLayer.lua", sky) end
     local flora = mod:read("payload_flora.lua")
     if flora then writeTracked(base .. "/lib/Flora.lua", flora) end
+    if worldHorizon then
+      writeTracked(base .. "/lib/WorldHorizon.lua", worldHorizon)
+    end
     if backdrop then writeTracked(base .. "/lib/Backdrop.lua", backdrop) end
     if artwork then writeTracked(base .. "/lib/backdrop.png", artwork) end
-    for _, extra in ipairs({ "backdrop2.png", "backdrop3.png",
+    for _, extra in ipairs({ "horizon-atlas.png",
+                             "backdrop2.png", "backdrop3.png",
                              "backdrop4.png", "posters.png",
                              "posters-pokecenter.png",
                              "posters-pokemart.png",
@@ -943,6 +953,7 @@ local Flora = __dsMod("Flora", "__ds_flora_status")]]
       if blob then writeTracked(base.. "/lib/" .. extra, blob) end
     end
     _G.__ds_backdrop_path = chosenArt(base, read)
+    _G.__ds_horizon_atlas_path = base .. "/lib/horizon-atlas.png"
     _G.__ds_posters_dir = base .. "/lib/"
     -- the options row is a nicety: without it the ceiling is simply ON
     -- Match the settings row with the same CRLF normalization used for the
@@ -978,7 +989,8 @@ local Flora = __dsMod("Flora", "__ds_flora_status")]]
   -- ChunkMesher.lua and Structures.lua on exactly that path).
   local OURS = {
     ["Ceiling.lua"] = true, ["Flora.lua"] = true, ["Backdrop.lua"] = true,
-    ["SkyLayer.lua"] = true, ["Jump.lua"] = true,
+    ["WorldHorizon.lua"] = true, ["SkyLayer.lua"] = true,
+    ["Jump.lua"] = true, ["horizon-atlas.png"] = true,
   }
   local function oursByName(path)
     local name = path:match("([^/]+)$") or ""
@@ -1084,10 +1096,12 @@ local Flora = __dsMod("Flora", "__ds_flora_status")]]
                            base .. "/lib/FirstPerson.lua",
                            base .. "/lib/Jump.lua",
                            base .. "/lib/Backdrop.lua",
+                           base .. "/lib/WorldHorizon.lua",
                            base .. "/lib/SkyLayer.lua",
                            base .. "/lib/Flora.lua",
                            base .. "/data/battle_arenas.lua",
-                           base .. "/lib/backdrop.png" }) do
+                           base .. "/lib/backdrop.png",
+                           base .. "/lib/horizon-atlas.png" }) do
         if inSave(p) then remove(p) end
       end
       remove(STATE_FILE)
@@ -1492,6 +1506,12 @@ local Flora = __dsMod("Flora", "__ds_flora_status")]]
       local theirs = read(base .. "/lib/Ceiling.lua") or ""
       local theirV = tonumber(theirs:match("payload%-version:%s*(%d+)")) or 1
       -- keep the horizon module and its painting in step as well
+      local wh = mod:read("payload_world_horizon.lua")
+      if wh and read(base .. "/lib/WorldHorizon.lua") ~= wh then
+        writeTracked(base .. "/lib/WorldHorizon.lua", wh)
+        hotSwap("WorldHorizon", wh)
+        say("location-aware horizon module refreshed.")
+      end
       local bd = mod:read("payload_backdrop.lua")
       if bd and read(base .. "/lib/Backdrop.lua") ~= bd then
         writeTracked(base .. "/lib/Backdrop.lua", bd)
@@ -1504,7 +1524,8 @@ local Flora = __dsMod("Flora", "__ds_flora_status")]]
       end
       -- extra panoramas and the poster sheet, refreshed whenever they
       -- differ so dropping new art in and rebooting is enough
-      for _, extra in ipairs({ "backdrop2.png", "backdrop3.png",
+      for _, extra in ipairs({ "horizon-atlas.png",
+                               "backdrop2.png", "backdrop3.png",
                                "backdrop4.png", "posters.png",
                                "posters-pokecenter.png",
                                "posters-pokemart.png",
@@ -1521,6 +1542,7 @@ local Flora = __dsMod("Flora", "__ds_flora_status")]]
         end
       end
       _G.__ds_backdrop_path = chosenArt(base, read)
+      _G.__ds_horizon_atlas_path = base .. "/lib/horizon-atlas.png"
       _G.__ds_posters_dir = base .. "/lib/"
       if myV > theirV then
         if writeTracked(base .. "/lib/Ceiling.lua", mine) then
@@ -1587,7 +1609,10 @@ local Flora = __dsMod("Flora", "__ds_flora_status")]]
     -- picking a different panorama did nothing until a restart.
     pcall(function()
       local base = rawget(_G, "__ds_patch_base")
-      if base then _G.__ds_backdrop_path = chosenArt(base, read) end
+      if base then
+        _G.__ds_backdrop_path = chosenArt(base, read)
+        _G.__ds_horizon_atlas_path = base .. "/lib/horizon-atlas.png"
+      end
     end)
     -- off unless deliberately switched on: the panel is a diagnostic,
     -- not part of the view
@@ -1600,6 +1625,8 @@ local Flora = __dsMod("Flora", "__ds_flora_status")]]
                      or "Ceiling module not loaded this session"
                      .. " -- check the mod manager for errors"),
         "HRZN: " .. (_G.__ds_backdrop_status or "Backdrop not loaded"),
+        "WHZN: " .. (_G.__ds_world_horizon_status
+                     or "World horizon beta idle"),
         "SKY:  " .. (_G.__ds_sky_status or "Sky layer not loaded"),
         "FLOR: " .. (_G.__ds_flora_status or "Flora not loaded"),
         -- Other mods' pipelines, and whether the engine has retired any.

@@ -24,9 +24,15 @@ function love.load()
     if #items == 1 then root = root .. "/" .. items[1] end
   end
   local manifest = love.filesystem.read(root .. "/manifest.json")
+  local worldModule = love.filesystem.getInfo(
+    root .. "/payload_world_horizon.lua", "file")
+  local worldAtlas = love.filesystem.getInfo(root .. "/horizon-atlas.png", "file")
   love.filesystem.unmount(fd)
   if not manifest or not manifest:find('"id"%s*:%s*"ds_fp_ceiling"') then
     return finish(false, "mounted archive has no Kanto manifest")
   end
-  finish(true, "PhysicsFS mounted Kanto archive and read manifest")
+  if not (worldModule and worldAtlas) then
+    return finish(false, "mounted archive lacks world-horizon runtime assets")
+  end
+  finish(true, "PhysicsFS mounted Kanto archive, manifest and horizon assets")
 end

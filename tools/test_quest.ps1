@@ -14,7 +14,8 @@ $python = (Get-Command python -ErrorAction Stop).Source
 if ($LASTEXITCODE -ne 0) { throw "Static Dramaless 2.0 contract failed" }
 
 $env:KANTO_TEST_DRAMALESS = $dramalessPath.Replace('\', '/')
-foreach ($test in @("love_syntax", "love_patch_contract")) {
+foreach ($test in @("love_syntax", "love_world_horizon",
+                     "love_patch_contract")) {
   $app = Join-Path $PSScriptRoot $test
   $result = Join-Path $app "result.txt"
   if (Test-Path -LiteralPath $result) {
@@ -33,8 +34,33 @@ foreach ($test in @("love_syntax", "love_patch_contract")) {
   Write-Host $detail.Trim()
 }
 
+Add-Type -AssemblyName System.Drawing
+$atlasPath = Join-Path $root "horizon-atlas.png"
+$atlas = [System.Drawing.Bitmap]::new($atlasPath)
+try {
+  if ($atlas.Width -ne 2048 -or $atlas.Height -ne 512 -or
+      $atlas.PixelFormat -ne
+        [System.Drawing.Imaging.PixelFormat]::Format32bppArgb) {
+    throw "World-horizon atlas is not the audited 2048x512 RGBA surface"
+  }
+  foreach ($sample in @(@(1536, 0), @(2047, 0), @(1536, 511), @(2047, 511))) {
+    if ($atlas.GetPixel($sample[0], $sample[1]).A -ne 0) {
+      throw "Reserved atlas quarter is not transparent at $($sample -join ',')"
+    }
+  }
+} finally {
+  $atlas.Dispose()
+}
+$atlasHash = (Get-FileHash -LiteralPath $atlasPath -Algorithm SHA256).Hash
+if ($atlasHash -ne
+    "A127D5CB966582AE21A29DA7D684C0F4B67B162CA4242213F92148D8F21C3B5B") {
+  throw "World-horizon atlas hash differs from the documented production art"
+}
+Write-Host "PASS: audited 2048x512 RGBA horizon atlas $atlasHash"
+
 & (Join-Path $PSScriptRoot "package_quest.ps1")
-$archive = Join-Path $root "dist\KANTO_FIRST_PERSON-1.60.0-quest.8.zip"
+$archive = Join-Path $root `
+  "dist\KANTO_FIRST_PERSON-1.60.0-quest.9-world-horizon.zip"
 $first = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash
 & (Join-Path $PSScriptRoot "package_quest.ps1")
 $second = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash

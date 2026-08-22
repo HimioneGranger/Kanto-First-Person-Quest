@@ -1,5 +1,5 @@
 -- The BACKDROP: a distant horizon for the outdoor world.
--- payload-version: 5
+-- payload-version: 6
 --
 -- Dramatic Shape's outdoor maps end where their meshes end -- past the
 -- last connected map is sky meeting nothing.  This hangs a painted
@@ -23,6 +23,7 @@ local V = ...
 local Voxel3D = V.require("Voxel3D")
 local Mat4 = V.require("Mat4")
 local okDN, DayNight = pcall(V.require, "DayNight")
+local okWH, WorldHorizon = pcall(V.require, "WorldHorizon")
 
 local Backdrop = {}
 
@@ -254,7 +255,7 @@ function Backdrop.draw(state)
     tex:setWrap("repeat", "clamp")
   end)
 
-  local drew = true
+  local drew, worldDrew = true, false
   guarded(function()
     -- behind everything: test against depth but never write to it, so no
     -- real geometry can ever be occluded by the painting
@@ -269,9 +270,18 @@ function Backdrop.draw(state)
       love.graphics.setColor(1, 1, 1, 1)
     end
     Voxel3D.draw(mesh, tex, Mat4.translate(px, 0, pz))
+    -- Experimental location-aware cards layer over the accepted panorama.
+    -- A missing coordinate, atlas, module or card is a no-op: the legacy
+    -- painting already drawn above remains the complete fallback.
+    if cfg.worldhorizon == true and okWH and WorldHorizon
+       and type(WorldHorizon.draw) == "function" then
+      local okWorld, didDraw = pcall(WorldHorizon.draw, state)
+      worldDrew = okWorld and didDraw and true or false
+    end
   end)
   if drew then
-    status(("drawn at r=%d, drift %.3f"):format(RADIUS, (px * DRIFT) % 1))
+    status(("drawn at r=%d, drift %.3f%s"):format(
+      RADIUS, (px * DRIFT) % 1, worldDrew and "; world card" or ""))
   else
     status("draw failed")
   end
@@ -282,6 +292,9 @@ function Backdrop.invalidate()
   mesh = nil
   if underMesh then pcall(underMesh.release, underMesh) end
   underMesh = nil
+  if okWH and WorldHorizon and WorldHorizon.invalidate then
+    pcall(WorldHorizon.invalidate)
+  end
 end
 
 -- live registration: the installer hot-swaps refreshed modules

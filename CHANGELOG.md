@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.60.0-quest.9 (candidate)
+
+- **LOCATION-AWARE HORIZON FOUNDATION.** Adds a disabled-by-default Quest
+  beta that places the first original-art Viridian Forest landmark card at
+  its Town Map compass bearing. Map changes interpolate the shared world
+  anchor for 0.6 seconds, and both OpenXR eyes reuse the exact same anchor.
+  The accepted panorama remains underneath as a safe fallback.
+- **BOUNDED QUEST ART PATH.** The first card lives in one 2048x512 RGBA atlas
+  (4 MiB GPU) and uses one reusable quad. The runtime admits at most eight
+  cards, performs no per-eye mesh build or filesystem scan, and releases its
+  atlas and mesh on invalidation. `WORLD HORIZON BETA` remains OFF until the
+  candidate passes physical Quest 3 bearing, transition, shimmer and frame-
+  time checks.
+- **ROLLBACK AND PACKAGE COVERAGE.** Apply, maintenance, hot refresh, explicit
+  removal, syntax, pure bearing/transition logic, stereo consistency,
+  deterministic packaging and PhysicsFS archive mounting now cover the new
+  module and atlas. q8 behavior is unchanged while the beta toggle is off.
+
 ## 1.60.0-quest.8
 
 - **ROUTE 7 BATTLE CAMERA CLEARANCE.** Live Quest evidence identified the

@@ -40,8 +40,8 @@ def main() -> None:
     manifest = json.loads((dramaless / "manifest.json").read_text(encoding="utf-8"))
     require(
         manifest.get("id") == "DRAMALESS_SHAPE"
-        and manifest.get("version") == "2.0.0-quest.7",
-        "test must target the accepted Dramaless 2.0 Quest q7 source",
+        and manifest.get("version") == "2.0.0-quest.9",
+        "test must target the current Dramaless 2.0 Quest q9 source",
     )
     require('["2.0.0"] = true' in source, "2.0.0 is not in Kanto's audited table")
 
@@ -191,7 +191,7 @@ def main() -> None:
         "unknown-version safe-refusal contract is missing",
     )
 
-    print("PASS: Dramaless 2.0 q7 anchors, Kanto arena fixes, payload API and rollback contract")
+    print("PASS: Dramaless 2.0 q9 anchors, Kanto arena fixes, payload API and rollback contract")
 
 
 if __name__ == "__main__":

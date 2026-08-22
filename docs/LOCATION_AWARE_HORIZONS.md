@@ -1,6 +1,8 @@
 # Location-aware Kanto horizons
 
-Status: design and art-direction prototype; no runtime behavior changed yet.
+Status: q9 candidate foundation implemented behind `WORLD HORIZON BETA`, which
+defaults OFF. Automated validation is required before physical Quest testing;
+the accepted q8 behavior remains the rollback baseline.
 
 ## Product goal
 
@@ -12,6 +14,28 @@ the same compass bearing when the player crosses a seamless map connection.
 This replaces the idea of choosing one unrelated panorama for the whole game.
 It does not replace Dramaless weather, sky, day/night, terrain, streaming,
 OpenXR, camera, or map ownership.
+
+## q9 implementation slice
+
+- `payload_world_horizon.lua` reads only `Game.data.field.townMap`, handles the
+  nested/direct and x/y, col/row, or `coords` entry forms used by Gen1Recomp,
+  and derives compass bearings without reading ROM files or map artwork.
+- The first visible card is Viridian Forest. It appears only within eight Town
+  Map cells, is interpolated for 0.6 seconds across map changes, and overlays
+  the accepted panorama. Missing coordinates, art, graphics support, or a
+  malformed destination retain that panorama rather than disabling voxel VR.
+- `horizon-atlas.png` is 2048x512 RGBA (4 MiB GPU), SHA-256
+  `A127D5CB966582AE21A29DA7D684C0F4B67B162CA4242213F92148D8F21C3B5B`.
+  Its first 1536x512 region is a nearest-neighbour production reduction of the
+  approved v3 forest concept; the remaining quarter stays transparent for the
+  next original-art cards.
+- One static quad is shared by both eyes. The first OpenXR eye advances the
+  transition and the second consumes the exact cached anchor. The feature
+  creates no per-eye mesh, per-frame filesystem scan, unique map texture,
+  physics body, emitter, shader, or ROM-derived cache.
+- This is intentionally not promotion-ready: city, plateau, coast/island and
+  route biome cards are not authored yet, and no performance or comfort claim
+  will be made until physical Quest 3 comparison against q8.
 
 ## Checked source facts
 
@@ -157,6 +181,27 @@ All three are art-direction sources, not yet shipped runtime textures.
 - visible-card and texture-memory caps;
 - legacy panorama unchanged when world horizons are disabled;
 - no ROM, save, generated cache, official art, or private material in package.
+
+The q9 candidate passed the complete `tools/test_quest.ps1` gate on
+2026-08-21 against Dramaless Quest q9 commit `0b0e6b7`:
+
+- all Lua sources compiled;
+- cardinal/diagonal/reciprocal bearings, Town Map entry variants, the 0.6
+  second transition, cold fallback, stereo anchor reuse, resource invalidation
+  and the Quest caps passed;
+- apply, repeated boot, q7-to-q8 migration coverage, explicit byte-for-byte
+  engine rollback and unknown-version refusal passed;
+- the 2048x512 RGBA atlas dimensions, transparent reserve and documented hash
+  passed;
+- two independent package builds produced the same 17,174,464-byte archive,
+  SHA-256
+  `9B571E0DDD39F8519F65F0DC1A154C83899B825BEE0B0DB3FF021A2BDDECDAB0`;
+- Android's PhysicsFS-compatible in-memory mount read the manifest, world
+  module and atlas; the archive contains no concept directory, ROM, save, APK
+  or generated cache.
+
+This is automated evidence only. It does not establish headset performance,
+comfort, scale, shimmer, compass correctness in-world, or promotion readiness.
 
 ### Physical Quest 3
 

@@ -171,6 +171,7 @@ Either way works:
 | LAMPLIGHT | ON | Doorway lamps casting light that stops at walls |
 | HORIZON | ON | The painted backdrop outdoors |
 | HORIZON ART | VALLEY | Which panorama: KANTO / FUJI / VALLEY / CITY |
+| WORLD HORIZON BETA | OFF | Quest-tested location cards at fixed compass bearings |
 | CLOUDS | ON | Drifting cloud decks |
 | NIGHT SKY | ON | Stars, nebula and shooting stars after dark |
 | BIRDS | ON | Flocks of distant flyers |

@@ -144,6 +144,13 @@ function love.load()
     check(scene:find("Mat4.translate(nb.ox, 0, nb.oy)", 1, true)
           < scene:find("pcall(Ceiling.draw, state, atlasFor)", 1, true),
           "ceiling/flora precede neighbour terrain")
+    check(q3.files[BASE .. "/lib/WorldHorizon.lua"] ~= nil,
+          "location-aware horizon module was not installed")
+    check(q3.files[BASE .. "/lib/horizon-atlas.png"] ~= nil,
+          "location-aware horizon atlas was not installed")
+    check(q3.files[BASE .. "/lib/Backdrop.lua"]:find(
+            "cfg.worldhorizon == true", 1, true) ~= nil,
+          "legacy backdrop lacks the disabled-by-default world-card gate")
 
     local first = assert(q3.files[BASE .. "/lib/FirstPerson.lua"])
     check(count(first, "Jump.eyeOffset") == 1, "jump eye patch missing/duplicated")
@@ -220,6 +227,10 @@ function love.load()
             .. ", firstDiff="
             .. tostring(firstDifference(restored, q3.originals[rel])) .. ")")
     end
+    check(q3.files[BASE .. "/lib/WorldHorizon.lua"] == nil,
+          "rollback left the owned world-horizon module installed")
+    check(q3.files[BASE .. "/lib/horizon-atlas.png"] == nil,
+          "rollback left the owned world-horizon atlas installed")
 
     -- Recreate an installed q7 state: its battle support plus Route 8 and
     -- Route 12 fixes are active, but Route 7 still uses Dramaless's native

@@ -2,6 +2,7 @@ local FILES = {
   "main.lua",
   "jump_button.lua",
   "payload_backdrop.lua",
+  "payload_world_horizon.lua",
   "payload_ceiling.lua",
   "payload_flora.lua",
   "payload_jump.lua",
