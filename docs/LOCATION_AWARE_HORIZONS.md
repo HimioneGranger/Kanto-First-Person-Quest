@@ -123,6 +123,9 @@ gate, cave, building, Fly, or other non-seamless warp.
 - Original interpretation only: no copied map art, official sprites, logos,
   UI, text, characters, creatures, or traced screenshots.
 - Crisp pixel clusters and readable silhouettes at headset distance.
+- Favor a GBC/GBA visual language with chunky stepped canopy, rock and
+  structure clusters that echo the voxel world; avoid painterly foliage and
+  modern high-frequency rendering.
 - Transparent background/sky; neutral daylight art that tolerates external
   day/night and weather tinting.
 - Avoid tiny detail that shimmers in stereo or disappears after atlas scaling.
@@ -132,7 +135,11 @@ gate, cave, building, Fly, or other non-seamless warp.
 The first concept is
 `artwork/concepts/viridian-forest-horizon-v1.png` (2172x724 RGBA, SHA-256
 `2E34E7B2FFEA5A6F106F3970886FCFF047A226858386A88717F6F8A641C9EB1C`).
-It is an art-direction source, not yet a shipped runtime texture.
+It established the silhouette but was too painterly. The revised
+GBC/GBA-and-voxel direction is
+`artwork/concepts/viridian-forest-horizon-v2.png` (2172x724 RGBA, SHA-256
+`1324C52590DDCCDFB7C4922C4C6CB6E90D7A4F8E756CA85E1B66B8367534B93C`).
+Both are art-direction sources, not yet shipped runtime textures.
 
 ## Acceptance tests
 
@@ -159,4 +166,3 @@ It is an art-direction source, not yet a shipped runtime texture.
    save in each side of a transition.
 6. Compare frame time, FPS, PSS, graphics memory and shimmer against the
    accepted legacy panorama. Do not promote without device evidence.
-
