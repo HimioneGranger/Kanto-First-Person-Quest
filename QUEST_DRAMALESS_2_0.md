@@ -14,6 +14,13 @@ per-arena camera-clearance fix. q7 adds the corresponding Route 12 water-stage
 correction after physical evidence showed that map's authored arena was wrong.
 q8 adds the same per-arena wide lens to Route 7 after a live Pidgey battle
 showed its long-lens eye was obstructed; its valid narrow stage is preserved.
+The first q9 physical archive added the optional world-horizon atlas but grew
+past the Quest launcher's practical 16 MiB in-memory staging boundary. Its ZIP
+headers, root, manifest and hash all verified, while the on-device importer
+failed at the PhysicsFS mount. q9 now stores the same 2048x512 composition as a
+palette-optimized indexed PNG, which still decodes to the audited 4 MiB runtime
+texture but keeps the complete mod archive below 16 MiB. The package test
+enforces that physical-import ceiling.
 
 ## Audited seams
 

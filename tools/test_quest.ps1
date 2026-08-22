@@ -38,10 +38,8 @@ Add-Type -AssemblyName System.Drawing
 $atlasPath = Join-Path $root "horizon-atlas.png"
 $atlas = [System.Drawing.Bitmap]::new($atlasPath)
 try {
-  if ($atlas.Width -ne 2048 -or $atlas.Height -ne 512 -or
-      $atlas.PixelFormat -ne
-        [System.Drawing.Imaging.PixelFormat]::Format32bppArgb) {
-    throw "World-horizon atlas is not the audited 2048x512 RGBA surface"
+  if ($atlas.Width -ne 2048 -or $atlas.Height -ne 512) {
+    throw "World-horizon atlas is not the audited 2048x512 surface"
   }
   foreach ($sample in @(@(1536, 0), @(2047, 0), @(1536, 511), @(2047, 511))) {
     if ($atlas.GetPixel($sample[0], $sample[1]).A -ne 0) {
@@ -53,10 +51,10 @@ try {
 }
 $atlasHash = (Get-FileHash -LiteralPath $atlasPath -Algorithm SHA256).Hash
 if ($atlasHash -ne
-    "A127D5CB966582AE21A29DA7D684C0F4B67B162CA4242213F92148D8F21C3B5B") {
+    "C3B88F9E164618878BD0163226B4E852AC3FEF1B648EF4DAC77017578D501DB2") {
   throw "World-horizon atlas hash differs from the documented production art"
 }
-Write-Host "PASS: audited 2048x512 RGBA horizon atlas $atlasHash"
+Write-Host "PASS: audited index-optimized 2048x512 horizon atlas $atlasHash"
 
 & (Join-Path $PSScriptRoot "package_quest.ps1")
 $archive = Join-Path $root `
@@ -65,8 +63,12 @@ $first = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash
 & (Join-Path $PSScriptRoot "package_quest.ps1")
 $second = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash
 if ($first -ne $second) { throw "Quest archive builds are not deterministic" }
+$archiveBytes = (Get-Item -LiteralPath $archive).Length
+if ($archiveBytes -ge 16MB) {
+  throw "Quest archive exceeds the physical importer's 16 MiB staging budget"
+}
 
-Write-Host "PASS: deterministic Quest package $first"
+Write-Host "PASS: deterministic Quest package $first ($archiveBytes bytes)"
 
 $env:KANTO_TEST_ARCHIVE = $archive
 $mountApp = Join-Path $PSScriptRoot "love_archive_mount"

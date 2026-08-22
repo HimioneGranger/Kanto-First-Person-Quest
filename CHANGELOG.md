@@ -13,6 +13,13 @@
   atlas and mesh on invalidation. `WORLD HORIZON BETA` remains OFF until the
   candidate passes physical Quest 3 bearing, transition, shimmer and frame-
   time checks.
+- **PHYSICAL IMPORT SIZE GUARD.** The first physical q9 archive crossed the
+  launcher's practical 16 MiB staging boundary and Android PhysicsFS refused
+  to mount it as a mod. The same 2048x512 composition is now palette-optimized
+  as an indexed PNG (still decoded to a 4 MiB GPU surface), bringing the
+  package back below the accepted boundary. Packaging now fails before release
+  if a future
+  candidate reaches 16 MiB. q8 remains the installed rollback baseline.
 - **ROLLBACK AND PACKAGE COVERAGE.** Apply, maintenance, hot refresh, explicit
   removal, syntax, pure bearing/transition logic, stereo consistency,
   deterministic packaging and PhysicsFS archive mounting now cover the new
