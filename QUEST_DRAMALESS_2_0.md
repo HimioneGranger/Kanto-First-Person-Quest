@@ -14,13 +14,24 @@ per-arena camera-clearance fix. q7 adds the corresponding Route 12 water-stage
 correction after physical evidence showed that map's authored arena was wrong.
 q8 adds the same per-arena wide lens to Route 7 after a live Pidgey battle
 showed its long-lens eye was obstructed; its valid narrow stage is preserved.
-The first q9 physical archive added the optional world-horizon atlas but grew
-past the Quest launcher's practical 16 MiB in-memory staging boundary. Its ZIP
-headers, root, manifest and hash all verified, while the on-device importer
-failed at the PhysicsFS mount. q9 now stores the same 2048x512 composition as a
-palette-optimized indexed PNG, which still decodes to the audited 4 MiB runtime
-texture but keeps the complete mod archive below 16 MiB. The package test
-enforces that physical-import ceiling.
+q9 stores the 2048x512 world-horizon composition as a palette-optimized indexed
+PNG, which still decodes to the audited 4 MiB runtime texture while removing
+about 733 KiB from the archive. The first diagnosis attributed the launcher's
+`that .zip could not be opened` notice to a 16 MiB staging boundary, but the
+complete physical process log disproved that theory: Android copied every byte
+to `picked_mod.zip`, the stage was consumed, and the next game load reported
+`loaded mod ds_fp_ceiling 1.60.0-quest.9`, refreshed the location-aware horizon
+module, and activated the ceiling patch. The misleading notice is a launcher
+picker-lifecycle issue, not a Kanto archive failure or size limit.
+
+## q9 physical import observation
+
+Quest 3 imported deterministic q9-r2 SHA-256
+`A61F0A150E37957E784C66184E373631DF9C00B4C0F468E40DC751579FE0D978`
+(16,442,822 bytes). The launcher showed a false failure notice, but process logs
+confirmed q9 loaded and applied. Visual bearing, transition, shimmer and frame-
+time acceptance remain pending; `WORLD HORIZON BETA` therefore remains OFF by
+default and q8 remains the rollback package.
 
 ## Audited seams
 
