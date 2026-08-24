@@ -1,4 +1,9 @@
-# Location-aware Kanto horizons
+# Archived KFP q9 location-aware horizon report
+
+New work moved to
+[Kanto World Horizons](https://github.com/HimioneGranger/Kanto-World-Horizons).
+This document and KFP's disabled q9 implementation are frozen migration
+evidence, not the active development location.
 
 Status: q9 candidate foundation implemented behind `WORLD HORIZON BETA`, which
 defaults OFF. Automated validation is required before physical Quest testing;
@@ -156,7 +161,7 @@ gate, cave, building, Fly, or other non-seamless warp.
 - Every source concept, production crop, atlas coordinate and checksum is
   recorded in the repository.
 
-The first concept is
+The first concept moved to Kanto World Horizons as
 `artwork/concepts/viridian-forest-horizon-v1.png` (2172x724 RGBA, SHA-256
 `2E34E7B2FFEA5A6F106F3970886FCFF047A226858386A88717F6F8A641C9EB1C`).
 It established the silhouette but was too painterly. The revised

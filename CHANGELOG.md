@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- **HORIZON OWNERSHIP SPLIT.** New location-aware horizon art, profile data,
+  transition planning, and future integration moved to the standalone Kanto
+  World Horizons project. KFP's disabled q9 implementation remains frozen only
+  as a rollback/compatibility reference until the new adapter is physically
+  validated. Original horizon concept sources are no longer maintained here.
+
 ## 1.60.0-quest.9 (candidate)
 
 - **LOCATION-AWARE HORIZON FOUNDATION.** Adds a disabled-by-default Quest

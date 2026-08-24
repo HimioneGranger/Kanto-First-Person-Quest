@@ -5,6 +5,12 @@
 > have been tested or supported by the original creator. See
 > [QUEST_PORT.md](QUEST_PORT.md) and [PERMISSION.md](PERMISSION.md).
 
+> **Location-aware horizon development moved.** New map profiles, transition
+> logic, and original horizon artwork now live in
+> [Kanto World Horizons](https://github.com/HimioneGranger/Kanto-World-Horizons).
+> KFP's disabled q9 experiment is frozen as migration evidence; see
+> [HORIZON_MIGRATION.md](HORIZON_MIGRATION.md).
+
 A companion mod for the **Dramatic Shape Voxel Mod** that finishes Kanto's
 first-person view.
 
@@ -171,7 +177,7 @@ Either way works:
 | LAMPLIGHT | ON | Doorway lamps casting light that stops at walls |
 | HORIZON | ON | The painted backdrop outdoors |
 | HORIZON ART | VALLEY | Which panorama: KANTO / FUJI / VALLEY / CITY |
-| WORLD HORIZON BETA | OFF | Quest-tested location cards at fixed compass bearings |
+| WORLD HORIZON BETA | OFF | Frozen q9 prototype; successor moved to Kanto World Horizons |
 | CLOUDS | ON | Drifting cloud decks |
 | NIGHT SKY | ON | Stars, nebula and shooting stars after dark |
 | BIRDS | ON | Flocks of distant flyers |

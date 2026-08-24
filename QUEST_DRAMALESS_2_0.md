@@ -1,5 +1,9 @@
 # Dramaless 2.0 Quest compatibility
 
+> Historical q9 compatibility report. New location-aware horizon development
+> moved to Kanto World Horizons. The q9 horizon code described below is frozen
+> here and remains disabled by default.
+
 This Quest fork adapts Kanto in First Person 1.60.0 to the current Dramaless
 2.0 Quest q9 source at commit `0b0e6b7`. The original compatibility audit used
 the q3 core baseline at commit `1b3ac8c`; its anchored seams are rechecked
