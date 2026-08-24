@@ -1,5 +1,10 @@
 # Kanto world-horizon art direction
 
+Map-boundary and hidden-load rules are defined in
+[`MAP_TRANSITION_PLAN.md`](MAP_TRANSITION_PLAN.md). In short: open route borders
+share continuous art, while doors, gates, caves, and covered travel may select
+a substantially different horizon profile.
+
 ## Status and boundary
 
 This folder is artwork-only while the Kanto rewrite from Bo is pending. None
